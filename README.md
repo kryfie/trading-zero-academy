@@ -1,71 +1,73 @@
-# Trading Zero Academy v0.2.2
+# Trading Zero Academy v0.2.3 — Marathon Mode
 
 An AlphaZero-inspired autonomous learning laboratory for OKX perpetual futures.
 
-## Student rules
+## Marathon
 
-The student starts without human trading indicators or strategy rules. It observes raw market/portfolio state, chooses exposure and leverage up to x10, and learns only from consequences inside the simulator.
+Student #1 keeps the same strategy-free learning rules from v0.2.2, but training no longer waits for the next day.
 
-World assumptions currently include:
+A single manual start launches an automatic chain toward **123,000,000 total timesteps** (the target can be changed in the Run workflow form).
+
+Each chained GitHub run trains at most ~10M requested steps and then saves the full Academy memory before automatically dispatching the next run.
+
+Inside every run:
+
+```text
++500k requested steps -> local model checkpoint
++500k -> checkpoint
++500k -> checkpoint
++500k -> checkpoint
+                 -> VALIDATION (~2M cadence)
+repeat until this ~10M leg ends
+                 -> save GitHub cache
+                 -> upload status/history
+                 -> automatically queue next leg
+```
+
+Stable-Baselines PPO completes fixed rollout chunks, so actual timestep counts can be slightly above the requested values. The marathon stops when the total counter reaches/exceeds the requested total target.
+
+## Automatic graduation stop
+
+Routine validation still uses the existing candidate gate. The marathon keeps a consecutive `MASTER_CANDIDATE` streak. If the gate is passed **3 validations in a row**, the marathon stops early to preserve compute and reports `graduation_ready: true`.
+
+This **does not** unlock or run the FINAL TEST. The frozen final holdout remains manual and locked.
+
+## Progress visibility
+
+`reports/learning_history.csv` receives one row every validation (~2M requested training steps), including:
+
+- total timesteps
+- median/mean validation return
+- median max drawdown
+- profitable episode ratio
+- profit factor
+- candidate status/streak
+
+Every chained run uploads this file together with `status.json` as a GitHub Artifact.
+
+The Academy also preserves `models/best_validation.zip` and metadata for the best validation checkpoint seen so far. This archive is observation/model-selection only; its score is never fed back into the learner's reward or weights.
+
+## Data policy — unchanged
+
+- original FINAL TEST: frozen forever; never trains
+- post-launch 0–7d: LIVE SHADOW
+- post-launch 7–30d: rolling validation
+- post-launch 30+d: eligible for TRAIN
+- OKX data refresh remains incremental
+
+## Student world — unchanged
 
 - OKX perpetual swaps
-- M5 bars
-- BTC, ETH, SOL, XRP and SUI USDT swaps
-- max leverage x10
-- taker fee 0.08% per turnover fill
-- historical funding events
-- deterministic volatility-aware slippage
-- no hand-authored RSI/MA/Heikin-Ashi/RR/SL/TP strategy
+- M5
+- BTC / ETH / SOL / XRP / SUI USDT swaps
+- leverage max x10
+- taker fee 0.08%
+- historical funding
+- modeled slippage
+- no human RSI / MA / Heikin-Ashi / RR / SL / TP strategy
 
-## Daily Academy schedule
+## How to start
 
-GitHub Actions runs once per day at `00:15 UTC`.
+GitHub -> Actions -> **Trading Zero Academy — Marathon** -> Run workflow.
 
-One run contains four autonomous training blocks:
-
-```text
-refresh OKX world
-  -> 500k steps -> checkpoint
-  -> 500k steps -> checkpoint
-  -> 500k steps -> checkpoint
-  -> 500k steps -> checkpoint
-  -> validation
-  -> LIVE SHADOW observation
-  -> status
-```
-
-Stable-Baselines PPO completes rollouts in fixed chunks, so the actual number of steps can be slightly above 2,000,000 per day.
-
-## Data conveyor belt
-
-The Academy preserves the original bootstrap split and never moves the original FINAL TEST.
-
-New market data created after the Academy bootstrap moves automatically with age:
-
-```text
-0–7 days old      LIVE SHADOW          never trains
-7–30 days old     rolling validation   never trains
-30+ days old      TRAIN eligible
-```
-
-Until enough post-launch data exists for rolling validation, the Academy uses the original frozen bootstrap validation set. This transition happens automatically.
-
-The original FINAL TEST remains permanently isolated even after it becomes old. It is only consumed through the separate Final Exam workflow after deliberate unlock.
-
-## Memory
-
-GitHub Actions restores and saves:
-
-- `models/latest.zip` — Student #1 PPO checkpoint
-- `models/training_state.json` — run/RNG progression
-- `data/processed` — accumulated OKX market history and immutable split manifest
-
-Therefore scheduled runs continue the same student rather than restarting it.
-
-## Status artifact
-
-Every run uploads `reports/status.json` and `reports/progress.json`. Status includes total timesteps, validation source/results, LIVE SHADOW result when enough data exists, and the timestamp/row ranges of TRAIN, validation, LIVE SHADOW and FROZEN FINAL.
-
-## Final exam
-
-The Final Exam is locked by default. Do not repeatedly run it to tune the learner. The frozen final holdout is deliberately protected from both training and routine model selection.
+Leave `target_total_timesteps = 123000000` and click Run workflow once. Subsequent legs are queued automatically. Do not manually run multiple marathon chains in parallel.

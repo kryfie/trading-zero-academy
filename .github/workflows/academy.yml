@@ -1,21 +1,39 @@
-name: Trading Zero Academy
+name: Trading Zero Academy — Marathon
 
 on:
   workflow_dispatch:
-  schedule:
-    # One daily Academy day. 00:15 UTC = 02:15 in Poland during summer time.
-    - cron: '15 0 * * *'
+    inputs:
+      target_total_timesteps:
+        description: 'Stop at this TOTAL Student #1 timestep count'
+        required: true
+        default: '123000000'
+        type: string
+      continuation:
+        description: 'Internal flag used by the automatic marathon chain'
+        required: true
+        default: false
+        type: boolean
+
+# Marathon runs one Student #1 chain at a time. A new leg waits rather than
+# racing the current learner/checkpoint.
+concurrency:
+  group: trading-zero-student-1
+  cancel-in-progress: false
 
 permissions:
   contents: read
+  actions: write
 
 env:
   PYTHONUNBUFFERED: '1'
   PYTHONPATH: .
+  ACADEMY_TARGET_TIMESTEPS: ${{ inputs.target_total_timesteps }}
 
 jobs:
-  learn:
+  marathon-leg:
     runs-on: ubuntu-latest
+    # Standard GitHub-hosted jobs have a 6h platform limit. We deliberately keep
+    # each leg around ~10M requested steps, well below it on the measured runner.
     timeout-minutes: 330
     steps:
       - uses: actions/checkout@v4
@@ -28,43 +46,84 @@ jobs:
       - name: Install
         run: pip install -r requirements.txt pytest
 
-      - name: Unit tests
+      - name: Unit tests on first marathon leg
+        if: ${{ !inputs.continuation }}
         run: pytest -q
 
-      - name: Restore academy memory
+      - name: Restore Student #1 + Academy memory
         uses: actions/cache/restore@v4
         with:
           path: |
             models
             data/processed
-          key: academy-${{ github.run_id }}
+            reports/learning_history.csv
+          key: academy-marathon-${{ github.run_id }}
           restore-keys: |
             academy-
 
-      - name: Refresh OKX world data
+      - name: Refresh OKX world data incrementally
         run: python scripts/download_data.py
 
-      - name: Learn autonomously — 4 x 500k with checkpoint each block
-        run: python scripts/train.py
+      - name: Marathon training — checkpoint 500k / validation 2M
+        run: python scripts/marathon_train.py
 
       - name: Show status
         run: python scripts/status.py
 
-      - name: Save academy memory
+      # Persist before dispatching the next leg. If the monthly Actions allowance
+      # is exhausted later, the next manual run can continue from this cache.
+      - name: Save Student #1 + Academy memory
         if: always()
         uses: actions/cache/save@v4
         with:
           path: |
             models
             data/processed
+            reports/learning_history.csv
           key: academy-${{ github.run_id }}
 
-      - name: Upload human-readable status
+      - name: Upload progress artifact — includes best Student ever
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: academy-status-${{ github.run_number }}
+          name: academy-marathon-${{ github.run_number }}
           path: |
             reports/status.json
             reports/progress.json
+            reports/learning_history.csv
+            models/best_validation.zip
+            models/best_validation.json
+            models/latest.zip
+            data/processed/split_manifest.json
+            data/processed/training_state.json
+          if-no-files-found: warn
           retention-days: 90
+
+      - name: Decide whether marathon continues
+        id: decision
+        if: success()
+        run: python scripts/marathon_decision.py
+
+      - name: Queue next marathon leg automatically
+        if: ${{ success() && steps.decision.outputs.continue == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET: ${{ steps.decision.outputs.target }}
+        run: |
+          echo "Queueing next leg from ${{ steps.decision.outputs.current }} toward ${TARGET} total steps..."
+          curl --fail-with-body -L \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/academy.yml/dispatches" \
+            -d "{\"ref\":\"${GITHUB_REF_NAME}\",\"inputs\":{\"target_total_timesteps\":\"${TARGET}\",\"continuation\":\"true\"}}"
+
+      - name: Marathon stop reason
+        if: ${{ success() && steps.decision.outputs.continue != 'true' }}
+        run: |
+          echo "Marathon chain stopped."
+          echo "Current steps: ${{ steps.decision.outputs.current }}"
+          echo "Target steps:  ${{ steps.decision.outputs.target }}"
+          echo "Graduation ready: ${{ steps.decision.outputs.graduation_ready }}"
+          echo "FINAL TEST remains LOCKED and must be started manually."

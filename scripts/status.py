@@ -12,6 +12,17 @@ else:
     print(f"STATUS: {s['status']}")
     print(f"Student: #{s.get('student', 1)}")
     print(f"Total timesteps: {s.get('total_timesteps', 0):,}")
+    if "marathon" in s:
+        m = s["marathon"]
+        print("Mode: MARATHON")
+        print(f"Marathon target: {m.get('target_total_timesteps', 0):,}")
+        print(f"Remaining: {m.get('remaining_timesteps', 0):,}")
+        print(
+            f"MASTER_CANDIDATE streak: {s.get('candidate_streak', 0)}/"
+            f"{s.get('master_candidate_streak_required', 3)}"
+        )
+        if s.get("graduation_ready"):
+            print("GRADUATION READY: YES — marathon stops; FINAL TEST stays LOCKED")
     print(f"Validation source: {s.get('validation_source', 'unknown')}")
     print(f"Median validation return: {v['median_return_pct']:.2f}%")
     print(f"Median max DD: {v['median_max_drawdown_pct']:.2f}%")
