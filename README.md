@@ -1,88 +1,71 @@
-# Trading Zero Academy v0.1
+# Trading Zero Academy v0.2.2
 
-An autonomous reinforcement-learning laboratory inspired by the **principle** behind AlphaGo Zero: the learner is not given a handcrafted trading strategy. It receives market state, legal actions, transaction costs and consequences.
+An AlphaZero-inspired autonomous learning laboratory for OKX perpetual futures.
 
-## World rules
+## Student rules
 
-- Exchange universe: OKX perpetual swaps (`*-USDT-SWAP`)
-- Timeframe: 5m
-- Maximum leverage: x10
-- Fee assumption: **0.08% per executed turnover** (`0.0008`)
-- Historical OKX funding is charged at funding events
-- Slippage is non-zero and volatility-aware
-- No RSI, MA, Heikin Ashi, RR, fixed SL or TP is supplied to the learner
-- Learner chooses short / flat / long and exposure up to x10
-- Training data and evaluation data are chronological and separate
+The student starts without human trading indicators or strategy rules. It observes raw market/portfolio state, chooses exposure and leverage up to x10, and learns only from consequences inside the simulator.
 
-## Architecture
+World assumptions currently include:
 
-`OKX public data -> market simulator -> PPO learner -> checkpoint -> validation evaluator`
+- OKX perpetual swaps
+- M5 bars
+- BTC, ETH, SOL, XRP and SUI USDT swaps
+- max leverage x10
+- taker fee 0.08% per turnover fill
+- historical funding events
+- deterministic volatility-aware slippage
+- no hand-authored RSI/MA/Heikin-Ashi/RR/SL/TP strategy
 
-The routine evaluator sees **validation**, not the final holdout. The final 15% chronological holdout is locked behind `reports/FINAL_TEST_UNLOCK` and has a separate manual workflow. This prevents the Academy from silently optimizing against its own final exam.
+## Daily Academy schedule
 
-## One-time GitHub setup
+GitHub Actions runs once per day at `00:15 UTC`.
 
-1. Create a new GitHub repository, e.g. `trading-zero-academy`.
-2. Upload all files from this package preserving folders.
-3. Open **Actions -> Trading Zero Academy -> Run workflow** once.
-4. After that, GitHub schedules a run every day at 02:17 UTC.
-5. Each run restores the latest model from GitHub Actions cache, refreshes OKX data, continues learning, validates, saves the new checkpoint and uploads `status.json` as an artifact.
+One run contains four autonomous training blocks:
 
-No OKX API key is needed for historical public market/funding data in v0.1. There is deliberately **no live-order code** in this release.
-
-## When has it learned something?
-
-The learner itself does not decide that. The evaluator marks `MASTER_CANDIDATE` only when the validation distribution passes all configured gates, currently:
-
-- median return >= +2%
-- median max drawdown <= 20%
-- at least 55% of validation episodes profitable
-- profit factor >= 1.05
-- minimum episode count met
-
-These are *candidate gates*, not proof of edge. When a model becomes a serious candidate, run the separate **Trading Zero Final Exam** workflow once. Do not repeatedly use final-test results to tune the learner.
-
-## Local commands (optional)
-
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
-pip install -r requirements.txt
-python scripts/download_data.py
-python scripts/train.py
-python scripts/status.py
+```text
+refresh OKX world
+  -> 500k steps -> checkpoint
+  -> 500k steps -> checkpoint
+  -> 500k steps -> checkpoint
+  -> 500k steps -> checkpoint
+  -> validation
+  -> LIVE SHADOW observation
+  -> status
 ```
 
-## Important v0.1 limitations
+Stable-Baselines PPO completes rollouts in fixed chunks, so the actual number of steps can be slightly above 2,000,000 per day.
 
-This is an academy prototype, not a production execution simulator. It includes historical funding, taker fees and a slippage model, but does not yet reconstruct order-book depth, partial fills, latency, maintenance-margin tiers, exchange liquidation engine behavior or changing historical fee tiers. Those belong in the next realism layer before demo/live evaluation.
+## Data conveyor belt
 
-## Safety boundary
+The Academy preserves the original bootstrap split and never moves the original FINAL TEST.
 
-Do not connect this learner directly to live capital. The intended progression is:
+New market data created after the Academy bootstrap moves automatically with age:
 
-`TRAIN -> VALIDATION -> locked FINAL HOLDOUT -> OKX DEMO/PAPER -> tiny controlled live experiment`
+```text
+0–7 days old      LIVE SHADOW          never trains
+7–30 days old     rolling validation   never trains
+30+ days old      TRAIN eligible
+```
 
+Until enough post-launch data exists for rolling validation, the Academy uses the original frozen bootstrap validation set. This transition happens automatically.
 
-## Automatic training schedule
+The original FINAL TEST remains permanently isolated even after it becomes old. It is only consumed through the separate Final Exam workflow after deliberate unlock.
 
-Version 0.2 runs the autonomous learner four times per day via GitHub Actions:
+## Memory
 
-- 00:15 UTC
-- 06:15 UTC
-- 12:15 UTC
-- 18:15 UTC
+GitHub Actions restores and saves:
 
-Each run restores the newest `models/latest.zip` checkpoint from the prior Academy cache, continues PPO learning for `total_timesteps_per_run`, evaluates the frozen checkpoint on validation data, saves a new checkpoint, and exits. A run does **not** create a fresh student unless no prior checkpoint exists.
+- `models/latest.zip` — Student #1 PPO checkpoint
+- `models/training_state.json` — run/RNG progression
+- `data/processed` — accumulated OKX market history and immutable split manifest
 
-With the default `500000` timesteps per run, the scheduled target is up to 2,000,000 additional environment timesteps per day, subject to GitHub Actions runtime limits and successful completion of each run.
+Therefore scheduled runs continue the same student rather than restarting it.
 
-The final holdout remains separate and is never used by the scheduled learning workflow.
+## Status artifact
 
-## v0.2.1 — fast world refresh + frozen exam
+Every run uploads `reports/status.json` and `reports/progress.json`. Status includes total timesteps, validation source/results, LIVE SHADOW result when enough data exists, and the timestamp/row ranges of TRAIN, validation, LIVE SHADOW and FROZEN FINAL.
 
-The Academy now keeps the cached OKX world between sessions. A normal scheduled run fetches only the newest candles and recent funding history, merges them into the cached parquet files, and falls back to a full historical backfill only when the recent data no longer overlaps the cache.
+## Final exam
 
-The first time v0.2.1 sees an existing v0.2 dataset, it also writes `data/processed/split_manifest.json` **before refreshing the market data**. This freezes the TRAIN / VALIDATION / FINAL TEST time boundaries. New candles are therefore not allowed to move the final holdout backward into training.
-
-This update changes infrastructure only. It does not add indicators, trading rules, SL/TP logic, or strategy hints to the learner.
+The Final Exam is locked by default. Do not repeatedly run it to tune the learner. The frozen final holdout is deliberately protected from both training and routine model selection.

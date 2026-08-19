@@ -1,18 +1,15 @@
-# Trading Zero Academy v0.2
+# Trading Zero Academy — Constitution v0.2.2
 
-# Academy Constitution
-
-1. The learner may change its neural-network weights freely.
-2. A human does not add trading indicators, entry rules, RR rules, SL rules or TP rules during learning.
-3. The learner cannot change exchange costs, leverage ceiling, data split or evaluator rules.
-4. Training receives only the TRAIN partition.
-5. Routine scoring receives only VALIDATION.
-6. FINAL TEST is not fed back into training.
-7. A profitable training curve is not evidence of mastery.
-8. A validation pass creates a MASTER CANDIDATE, not a live trader.
-9. Demo/paper forward performance is required before any live-capital stage.
-10. Every realism cost discovered before live deployment is added to the simulator rather than ignored.
-
-## Data integrity rule (v0.2.1)
-
-TRAIN / VALIDATION / FINAL TEST timestamp boundaries are frozen once in `data/processed/split_manifest.json`. Routine market refreshes may append new candles, but they must never move previously held-out data into TRAIN. Infrastructure may be optimized for speed; learner strategy inputs and reward rules must not be changed merely because results are poor.
+1. The learner receives no human trading strategy, indicators, RR, SL/TP rules or directional hints.
+2. The market world is OKX perpetual futures, max leverage x10, taker fee 0.08%, historical funding and modeled slippage.
+3. Reward/world/learner rules are not changed merely because performance is poor.
+4. Student #1 continues from its checkpoint; a new GitHub run must not silently restart learning.
+5. One Academy day runs once per day and contains four autonomous 500k-step training blocks. A checkpoint is saved after every block.
+6. The original FINAL TEST is permanently frozen and never enters training.
+7. Post-launch data follows an automatic conveyor belt:
+   - age 0–7 days: LIVE SHADOW — observation only;
+   - age 7–30 days: rolling validation — evaluation only;
+   - age 30+ days: eligible for TRAIN.
+8. LIVE SHADOW and validation results do not directly alter learner weights and are not fed back as reward.
+9. Historical market data is accumulated; old training history is not deleted just because time passes.
+10. Live execution is not part of this version. A candidate must pass independent evaluation before OKX Demo/live is considered.

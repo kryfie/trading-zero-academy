@@ -12,3 +12,5 @@ models/*
 reports/*.json
 reports/*.csv
 reports/FINAL_TEST_UNLOCK
+
+.pytest_cache/

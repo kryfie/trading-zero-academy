@@ -3,7 +3,8 @@ name: Trading Zero Academy
 on:
   workflow_dispatch:
   schedule:
-    - cron: '15 0,6,12,18 * * *'
+    # One daily Academy day. 00:15 UTC = 02:15 in Poland during summer time.
+    - cron: '15 0 * * *'
 
 permissions:
   contents: read
@@ -43,7 +44,7 @@ jobs:
       - name: Refresh OKX world data
         run: python scripts/download_data.py
 
-      - name: Learn autonomously
+      - name: Learn autonomously — 4 x 500k with checkpoint each block
         run: python scripts/train.py
 
       - name: Show status
@@ -63,5 +64,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: academy-status-${{ github.run_number }}
-          path: reports/status.json
+          path: |
+            reports/status.json
+            reports/progress.json
           retention-days: 90

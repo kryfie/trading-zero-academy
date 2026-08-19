@@ -193,12 +193,26 @@ def _full_symbol_download(
     funding = client.funding_history(symbol, days=days)
     merged = merge_market_and_funding(candles, funding)
     merged["symbol"] = symbol
+
+    # Never throw away older Academy history. A recovery/backfill only repairs or
+    # extends the world; it does not replace the accumulated historical archive.
+    old_len = 0
+    if path.exists():
+        try:
+            cached = pd.read_parquet(path).sort_values("ts").drop_duplicates("ts", keep="last")
+            old_len = len(cached)
+            merged = pd.concat([cached, merged], ignore_index=True, sort=False)
+            merged = merged.sort_values("ts").drop_duplicates("ts", keep="last").reset_index(drop=True)
+            merged["symbol"] = symbol
+        except Exception:
+            pass
+
     merged.to_parquet(path, index=False)
     return {
         "symbol": symbol,
         "mode": "full",
         "bars": int(len(merged)),
-        "new_bars": int(len(merged)),
+        "new_bars": int(max(0, len(merged) - old_len)),
         "funding_events": int((merged["funding_rate"] != 0).sum()),
     }
 
@@ -251,10 +265,9 @@ def refresh_symbol(
     combined = pd.concat([cached, recent], ignore_index=True, sort=False)
     combined = combined.sort_values("ts").drop_duplicates("ts", keep="last")
 
-    # Keep the same rolling historical horizon as v0.2; this only manages storage.
-    now_ms = int(pd.Timestamp.now(tz="UTC").timestamp() * 1000)
-    cutoff = now_ms - int(pd.Timedelta(days=days).total_seconds() * 1000)
-    combined = combined[combined["ts"] >= cutoff].reset_index(drop=True)
+    # Keep the entire accumulated Academy history. Old training data must not
+    # disappear just because the live market moves forward.
+    combined = combined.reset_index(drop=True)
     combined["symbol"] = symbol
     combined.to_parquet(path, index=False)
 

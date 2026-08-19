@@ -29,7 +29,8 @@ world_rules:
 
 learner:
   algorithm: PPO
-  total_timesteps_per_run: 500000
+  timesteps_per_block: 500000
+  blocks_per_run: 4
   learning_rate: 0.0003
   n_steps: 2048
   batch_size: 256
@@ -40,10 +41,21 @@ learner:
   policy_layers: [256, 256]
 
 evaluation:
+  # These fractions are used only once to create the original frozen world.
   train_fraction: 0.70
   validation_fraction: 0.15
   final_test_fraction: 0.15
+
+  # New post-launch market data follows this automatic conveyor belt:
+  # age 0-7d   -> LIVE SHADOW (never used for learning)
+  # age 7-30d  -> rolling validation (never used for learning)
+  # age >=30d  -> eligible for TRAIN
+  live_shadow_days: 7
+  train_maturation_days: 30
+  min_rolling_validation_bars: 2016
+
   validation_episodes: 30
+  live_shadow_episodes: 10
   candidate_min_episodes: 20
   candidate_min_median_return_pct: 2.0
   candidate_max_median_drawdown_pct: 20.0
@@ -53,5 +65,7 @@ evaluation:
 
 runtime:
   checkpoint_path: models/latest.zip
+  training_state_path: models/training_state.json
   vecnorm_path: models/vecnormalize.pkl
   status_path: reports/status.json
+  progress_path: reports/progress.json
