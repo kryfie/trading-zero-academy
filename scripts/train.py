@@ -6,7 +6,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 
 from academy.config import load_config, ROOT
-from academy.dataset import load_frames, split_frames
+from academy.dataset import load_frames, split_frames, SPLIT_MANIFEST_NAME
 from academy.env import TradingAcademyEnv
 from academy.evaluate import evaluate_model, passes_candidate_gate
 
@@ -16,7 +16,12 @@ e = cfg["evaluation"]
 rules = cfg["world_rules"]
 seed = int(cfg["project"]["seed"])
 frames = load_frames(ROOT / "data" / "processed", m["symbols"], m["bar"])
-train_frames, val_frames, _ = split_frames(frames, float(e["train_fraction"]), float(e["validation_fraction"]))
+train_frames, val_frames, _ = split_frames(
+    frames,
+    float(e["train_fraction"]),
+    float(e["validation_fraction"]),
+    manifest_path=ROOT / "data" / "processed" / SPLIT_MANIFEST_NAME,
+)
 
 checkpoint = ROOT / cfg["runtime"]["checkpoint_path"]
 checkpoint.parent.mkdir(parents=True, exist_ok=True)
@@ -52,6 +57,7 @@ candidate = passes_candidate_gate(metrics, cfg)
 status = {
     "timestamp_utc": int(time.time()),
     "status": "MASTER_CANDIDATE" if candidate else "LEARNING",
+    "total_timesteps": int(model.num_timesteps),
     "validation": metrics,
     "final_test_locked": True,
     "note": "Final test is intentionally not used for learning or routine model selection.",

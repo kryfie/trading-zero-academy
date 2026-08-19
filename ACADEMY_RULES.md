@@ -12,3 +12,7 @@
 8. A validation pass creates a MASTER CANDIDATE, not a live trader.
 9. Demo/paper forward performance is required before any live-capital stage.
 10. Every realism cost discovered before live deployment is added to the simulator rather than ignored.
+
+## Data integrity rule (v0.2.1)
+
+TRAIN / VALIDATION / FINAL TEST timestamp boundaries are frozen once in `data/processed/split_manifest.json`. Routine market refreshes may append new candles, but they must never move previously held-out data into TRAIN. Infrastructure may be optimized for speed; learner strategy inputs and reward rules must not be changed merely because results are poor.

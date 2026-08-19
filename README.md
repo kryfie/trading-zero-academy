@@ -78,3 +78,11 @@ Each run restores the newest `models/latest.zip` checkpoint from the prior Acade
 With the default `500000` timesteps per run, the scheduled target is up to 2,000,000 additional environment timesteps per day, subject to GitHub Actions runtime limits and successful completion of each run.
 
 The final holdout remains separate and is never used by the scheduled learning workflow.
+
+## v0.2.1 — fast world refresh + frozen exam
+
+The Academy now keeps the cached OKX world between sessions. A normal scheduled run fetches only the newest candles and recent funding history, merges them into the cached parquet files, and falls back to a full historical backfill only when the recent data no longer overlaps the cache.
+
+The first time v0.2.1 sees an existing v0.2 dataset, it also writes `data/processed/split_manifest.json` **before refreshing the market data**. This freezes the TRAIN / VALIDATION / FINAL TEST time boundaries. New candles are therefore not allowed to move the final holdout backward into training.
+
+This update changes infrastructure only. It does not add indicators, trading rules, SL/TP logic, or strategy hints to the learner.
