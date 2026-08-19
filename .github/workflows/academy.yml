@@ -1,0 +1,67 @@
+name: Trading Zero Academy
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 0,6,12,18 * * *'
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUNBUFFERED: '1'
+  PYTHONPATH: .
+
+jobs:
+  learn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install
+        run: pip install -r requirements.txt pytest
+
+      - name: Unit tests
+        run: pytest -q
+
+      - name: Restore academy memory
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            models
+            data/processed
+          key: academy-${{ github.run_id }}
+          restore-keys: |
+            academy-
+
+      - name: Refresh OKX world data
+        run: python scripts/download_data.py
+
+      - name: Learn autonomously
+        run: python scripts/train.py
+
+      - name: Show status
+        run: python scripts/status.py
+
+      - name: Save academy memory
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            models
+            data/processed
+          key: academy-${{ github.run_id }}
+
+      - name: Upload human-readable status
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: academy-status-${{ github.run_number }}
+          path: reports/status.json
+          retention-days: 90

@@ -1,0 +1,38 @@
+name: Trading Zero Final Exam
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: .
+
+jobs:
+  exam:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Restore latest academy memory
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            models
+            data/processed
+          key: final-exam-${{ github.run_id }}
+          restore-keys: |
+            academy-
+      - name: Explicitly unlock holdout
+        run: touch reports/FINAL_TEST_UNLOCK
+      - name: Run once-only style final holdout
+        run: python scripts/final_exam.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: final-exam-${{ github.run_number }}
+          path: reports/final_exam.json
