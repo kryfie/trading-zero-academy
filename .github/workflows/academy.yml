@@ -14,8 +14,6 @@ on:
         default: false
         type: boolean
 
-# Marathon runs one Student #1 chain at a time. A new leg waits rather than
-# racing the current learner/checkpoint.
 concurrency:
   group: trading-zero-student-1
   cancel-in-progress: false
@@ -32,9 +30,8 @@ env:
 jobs:
   marathon-leg:
     runs-on: ubuntu-latest
-    # Standard GitHub-hosted jobs have a 6h platform limit. We deliberately keep
-    # each leg around ~10M requested steps, well below it on the measured runner.
     timeout-minutes: 330
+
     steps:
       - uses: actions/checkout@v4
 
@@ -50,7 +47,10 @@ jobs:
         if: ${{ !inputs.continuation }}
         run: pytest -q
 
-      - name: Restore Student #1 + Academy memory
+      # New Marathon caches use this exact path set. Keeping the path set stable
+      # is important because GitHub cache "version" depends on the cached paths.
+      - name: Restore Marathon Student #1 memory
+        id: restore_marathon
         uses: actions/cache/restore@v4
         with:
           path: |
@@ -59,7 +59,47 @@ jobs:
             reports/learning_history.csv
           key: academy-marathon-${{ github.run_id }}
           restore-keys: |
+            academy-marathon-
+
+      # v0.2.2 used only models + data/processed. A cache created with those
+      # paths has a different GitHub cache version, so it must be restored in a
+      # separate action using the original path set.
+      - name: Restore legacy v0.2.2 Student #1 if needed
+        if: ${{ hashFiles('models/latest.zip') == '' }}
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            models
+            data/processed
+          key: academy-legacy-bootstrap-${{ github.run_id }}
+          restore-keys: |
             academy-
+
+      # Safety rule: never silently create a fresh Student during a marathon.
+      # The user already has Student #1; if continuity is lost, fail instead.
+      - name: Verify Student #1 continuity
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from stable_baselines3 import PPO
+
+          checkpoint = Path("models/latest.zip")
+          if not checkpoint.exists():
+              raise SystemExit(
+                  "STOP: Student #1 checkpoint was not restored. "
+                  "Marathon refuses to start a new Student from zero."
+              )
+
+          model = PPO.load(checkpoint)
+          steps = int(model.num_timesteps)
+          if steps <= 0:
+              raise SystemExit(
+                  "STOP: restored checkpoint has zero timesteps. "
+                  "Marathon refuses to replace Student #1."
+              )
+
+          print(f"CONTINUITY OK — Student #1 restored at {steps:,} total timesteps")
+          PY
 
       - name: Refresh OKX world data incrementally
         run: python scripts/download_data.py
@@ -70,9 +110,7 @@ jobs:
       - name: Show status
         run: python scripts/status.py
 
-      # Persist before dispatching the next leg. If the monthly Actions allowance
-      # is exhausted later, the next manual run can continue from this cache.
-      - name: Save Student #1 + Academy memory
+      - name: Save Student #1 + Marathon memory
         if: always()
         uses: actions/cache/save@v4
         with:
@@ -80,7 +118,7 @@ jobs:
             models
             data/processed
             reports/learning_history.csv
-          key: academy-${{ github.run_id }}
+          key: academy-marathon-${{ github.run_id }}
 
       - name: Upload progress artifact — includes best Student ever
         if: always()
