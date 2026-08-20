@@ -55,6 +55,18 @@ jobs:
       - name: Install
         run: pip install -r requirements.txt pytest
 
+      - name: Verify v0.4 code layout
+        if: ${{ !inputs.continuation }}
+        run: |
+          test -f academy/cohort.py
+          test -f academy/mtf_env.py
+          test -f scripts/cohort_train.py
+          test -f scripts/cohort_decision.py
+          test -f scripts/final_exam.py
+          test -f tests/test_cohort.py
+          test -f tests/test_mtf.py
+          echo "v0.4 layout OK"
+
       - name: Unit tests on first v0.4 round
         if: ${{ !inputs.continuation }}
         run: pytest -q
@@ -85,7 +97,7 @@ jobs:
             academy-world-
 
       - name: Restore legacy Marathon world + Student #1 for first migration
-        if: ${{ hashFiles('data/processed/**/*') == '' }}
+        if: ${{ !inputs.continuation }}
         uses: actions/cache/restore@v4
         with:
           path: |

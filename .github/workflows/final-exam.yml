@@ -1,38 +1,72 @@
-name: Trading Zero Final Exam
+name: Trading Zero Final Exam — Cohort
 
 on:
   workflow_dispatch:
+    inputs:
+      student_id:
+        description: 'Student ID that already has a frozen 3x MASTER_CANDIDATE (e.g. 002)'
+        required: true
+        default: '001'
+        type: string
 
 permissions:
   contents: read
 
 env:
   PYTHONPATH: .
+  STUDENT_ID: ${{ inputs.student_id }}
 
 jobs:
   exam:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: pip
+
       - run: pip install -r requirements.txt
-      - name: Restore latest academy memory
+
+      - name: Restore M5 Academy world
         uses: actions/cache/restore@v4
         with:
-          path: |
-            models
-            data/processed
-          key: final-exam-${{ github.run_id }}
+          path: data/processed
+          key: final-v04-world-${{ github.run_id }}
           restore-keys: |
-            academy-
-      - name: Explicitly unlock holdout
-        run: touch reports/FINAL_TEST_UNLOCK
-      - name: Run once-only style final holdout
+            academy-world-v04-
+            academy-world-
+
+      - name: Restore raw multi-timeframe world
+        uses: actions/cache/restore@v4
+        with:
+          path: data/mtf
+          key: final-v04-mtf-world-${{ github.run_id }}
+          restore-keys: |
+            academy-mtf-world-
+
+      - name: Restore selected Student
+        uses: actions/cache/restore@v4
+        with:
+          path: students/${{ inputs.student_id }}
+          key: final-v04-student-${{ inputs.student_id }}-${{ github.run_id }}
+          restore-keys: |
+            academy-v04-student-${{ inputs.student_id }}-
+            academy-student-${{ inputs.student_id }}-
+
+      - name: Verify exam is legitimately unlocked
+        run: |
+          test -f students/${STUDENT_ID}/models/master_candidate.zip || {
+            echo "FINAL TEST LOCKED: Student ${STUDENT_ID} has no frozen 3x MASTER_CANDIDATE checkpoint."
+            exit 1
+          }
+
+      - name: Consume frozen FINAL exactly for selected candidate
         run: python scripts/final_exam.py
+
       - uses: actions/upload-artifact@v4
         with:
-          name: final-exam-${{ github.run_number }}
-          path: reports/final_exam.json
+          name: final-exam-student-${{ inputs.student_id }}-${{ github.run_number }}
+          path: students/${{ inputs.student_id }}/reports/final_exam.json

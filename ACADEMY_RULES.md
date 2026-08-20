@@ -1,17 +1,14 @@
-# Trading Zero Academy — Constitution v0.2.3 Marathon
+# Trading Zero Academy Constitution — v0.3.0
 
-1. The learner receives no human trading strategy, indicators, RR, SL/TP rules or directional hints.
-2. The market world is OKX perpetual futures, max leverage x10, taker fee 0.08%, historical funding and modeled slippage.
-3. Reward/world/learner rules are not changed merely because performance is poor.
-4. Student #1 always continues from its checkpoint; a new GitHub run must not silently restart learning.
-5. Marathon training uses 500k requested-step blocks and saves the PPO checkpoint after every block.
-6. Routine validation is performed every 4 blocks (~2M requested steps) and appended to `learning_history.csv`.
-7. Validation never directly alters learner weights/reward. It is only an evaluator/model-selection signal.
-8. The original FINAL TEST is permanently frozen and never enters training or routine marathon evaluation.
-9. Post-launch data follows the automatic conveyor belt: 0–7d LIVE SHADOW; 7–30d rolling validation; 30+d TRAIN eligible.
-10. Historical market data accumulates; old training history is not deleted just because time passes.
-11. A chained GitHub marathon run handles at most ~10M requested steps, then persists Academy memory and queues the next run.
-12. Default marathon target is 123M TOTAL Student #1 timesteps, not +123M from the moment Marathon Mode starts.
-13. If the existing MASTER_CANDIDATE gate passes 3 routine validations consecutively, marathon training stops early and reports `graduation_ready`. FINAL TEST remains locked and manual.
-14. `best_validation.zip` is an archive only. Student #1 continues learning from `latest.zip`; the best-validation archive is never injected back into training.
-15. Live execution is not part of this version. FINAL TEST and later OKX Demo remain separate graduation stages.
+1. **No strategy hints.** Students are not given human indicators, named setups, fixed RR, SL/TP logic, or discretionary entry rules.
+2. **World rules are external laws.** OKX SWAP market, max x10 leverage, configured fees, funding, slippage, and simulator accounting cannot be altered by a student.
+3. **Independent students.** Every student has its own seed, weights, optimizer state, checkpoint, and history. Students do not copy or exchange policies.
+4. **Same exam conditions.** In a cohort round, every student receives the same market-world snapshot and the same validation protocol.
+5. **No FINAL leakage.** Frozen FINAL data is never used for training, rolling validation, leaderboard ranking, Policy Autopsy, or hyperparameter decisions.
+6. **Checkpoint history matters.** LATEST is not assumed to be BEST. The best validation checkpoint is retained even if later learning collapses.
+7. **MASTER_CANDIDATE is pre-defined.** A candidate requires the configured gate to pass on 3 consecutive validations. The first such checkpoint is frozen separately.
+8. **FINAL is manual.** No workflow may automatically consume FINAL. The exam is allowed only for a student with a frozen 3x MASTER_CANDIDATE checkpoint.
+9. **Policy Autopsy is observational.** It may explain differences in behavior (flat time, leverage, turnover, fees, slippage, funding, gross PnL) but its findings are not fed back into learning.
+10. **Student #1 continuity is protected.** Migration from legacy Marathon must restore its existing model; failure stops the workflow instead of silently creating a new Student #1.
+11. **New students truly start at zero.** Student #2+ may be created only when their own cache does not yet exist.
+12. **No manual rescue.** A losing student is not repaired by adding indicators or changing its policy based on observed validation performance. Experimental changes require a new version/experiment, not silent intervention in an existing student.

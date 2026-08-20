@@ -57,6 +57,8 @@ class TradingAcademyEnv(gym.Env):
         self.entry_price = 0.0
         self.total_fees = 0.0
         self.total_funding = 0.0
+        self.total_slippage = 0.0
+        self.total_market_pnl = 0.0
         self.trade_pnls: list[float] = []
 
     def _choose_episode(self):
@@ -109,6 +111,8 @@ class TradingAcademyEnv(gym.Env):
         self.entry_price = 0.0
         self.total_fees = 0.0
         self.total_funding = 0.0
+        self.total_slippage = 0.0
+        self.total_market_pnl = 0.0
         self.trade_pnls = []
         return self._obs(), {"symbol": self.symbol}
 
@@ -140,6 +144,7 @@ class TradingAcademyEnv(gym.Env):
         slip_cost = self.equity * turnover * slip
         self.equity -= fee_cost + slip_cost
         self.total_fees += fee_cost
+        self.total_slippage += slip_cost
 
         # Set desired portfolio at next open, then mark to next close.
         self.position = desired_side
@@ -148,6 +153,7 @@ class TradingAcademyEnv(gym.Env):
             market_ret = (next_close - next_open) / max(next_open, 1e-12)
             pnl = self.equity * self.position * self.leverage * self.max_position_fraction * market_ret
             self.equity += pnl
+            self.total_market_pnl += pnl
             self.trade_pnls.append(float(pnl - fee_cost - slip_cost))
 
         # Recorded funding event applies to position held across that event.
@@ -175,5 +181,7 @@ class TradingAcademyEnv(gym.Env):
             "drawdown_pct": 100 * dd,
             "fees": self.total_fees,
             "funding": self.total_funding,
+            "slippage": self.total_slippage,
+            "gross_market_pnl": self.total_market_pnl,
         }
         return self._obs(), reward, terminated, truncated, info

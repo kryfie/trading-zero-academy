@@ -14,3 +14,8 @@ reports/*.csv
 reports/FINAL_TEST_UNLOCK
 
 .pytest_cache/
+students/*
+!students/.gitkeep
+reports/cohort/
+cohort-artifacts/
+migration/
