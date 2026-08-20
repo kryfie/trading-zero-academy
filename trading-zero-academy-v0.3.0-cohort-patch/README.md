@@ -1,7 +1,3 @@
-# Trading Zero Academy v0.4.0
-
-See `MARKET_STUDENTS_v0.4.md` for the Market Student design.
-
 # Trading Zero Academy
 
 AlphaZero-inspired autonomous trading research lab for OKX perpetual futures.

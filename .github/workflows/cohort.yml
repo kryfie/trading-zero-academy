@@ -1,0 +1,278 @@
+name: Trading Zero Academy — v0.4 Market Cohort
+
+on:
+  workflow_dispatch:
+    inputs:
+      student_count:
+        description: 'Student #1 = preserved M5 baseline; Student #2+ = raw M1/M5/M15/H1/H4 Market Students'
+        required: true
+        default: '8'
+        type: string
+      target_total_timesteps:
+        description: 'TOTAL timestep ceiling per student'
+        required: true
+        default: '500000000'
+        type: string
+      auto_continue:
+        description: 'Automatically queue next cohort round'
+        required: true
+        default: true
+        type: boolean
+      continuation:
+        description: 'Internal flag'
+        required: true
+        default: false
+        type: boolean
+
+concurrency:
+  group: trading-zero-market-cohort
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: write
+
+env:
+  PYTHONUNBUFFERED: '1'
+  PYTHONPATH: .
+  COHORT_TARGET_TIMESTEPS: ${{ inputs.target_total_timesteps }}
+
+jobs:
+  prepare-world:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    outputs:
+      students: ${{ steps.matrix.outputs.students }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install
+        run: pip install -r requirements.txt pytest
+
+      - name: Unit tests on first v0.4 round
+        if: ${{ !inputs.continuation }}
+        run: pytest -q
+
+      - name: Build student matrix
+        id: matrix
+        env:
+          STUDENT_COUNT: ${{ inputs.student_count }}
+        run: |
+          python - <<'PY'
+          import json, os
+          n = int(os.environ['STUDENT_COUNT'])
+          if not 2 <= n <= 16:
+              raise SystemExit('v0.4 student_count must be between 2 and 16')
+          students = [f'{i:03d}' for i in range(1, n + 1)]
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
+              f.write('students=' + json.dumps(students) + '\n')
+          print('Students:', students)
+          PY
+
+      - name: Restore shared M5 baseline world
+        uses: actions/cache/restore@v4
+        with:
+          path: data/processed
+          key: academy-world-v04-${{ github.run_id }}
+          restore-keys: |
+            academy-world-v04-
+            academy-world-
+
+      - name: Restore legacy Marathon world + Student #1 for first migration
+        if: ${{ hashFiles('data/processed/**/*') == '' }}
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            models
+            data/processed
+            reports/learning_history.csv
+          key: academy-v04-legacy-${{ github.run_id }}
+          restore-keys: |
+            academy-marathon-
+
+      - name: Verify Student #1 migration source exists
+        if: ${{ !inputs.continuation }}
+        run: |
+          test -f models/latest.zip || {
+            echo 'STOP: final Marathon Student #1 was not restored. Refusing to replace it.'
+            exit 1
+          }
+          python - <<'PY'
+          from stable_baselines3 import PPO
+          m=PPO.load('models/latest.zip')
+          print(f'Student #1 migration source: {m.num_timesteps:,} timesteps')
+          PY
+
+      - name: Refresh original M5 baseline world
+        run: python scripts/download_data.py
+
+      - name: Restore raw multi-timeframe world
+        uses: actions/cache/restore@v4
+        with:
+          path: data/mtf
+          key: academy-mtf-world-${{ github.run_id }}
+          restore-keys: |
+            academy-mtf-world-
+
+      - name: Build / refresh raw M1→M5/M15/H1/H4 world
+        run: python scripts/download_mtf_data.py
+
+      - name: Prepare one-time Student #1 migration bundle
+        run: |
+          mkdir -p migration/student1/models
+          if [ -f models/latest.zip ]; then
+            cp -a models/. migration/student1/models/
+          fi
+          if [ -f reports/learning_history.csv ]; then
+            cp reports/learning_history.csv migration/student1/learning_history.csv
+          fi
+
+      - name: Save M5 world cache
+        uses: actions/cache/save@v4
+        with:
+          path: data/processed
+          key: academy-world-v04-${{ github.run_id }}
+
+      - name: Save raw MTF world cache
+        uses: actions/cache/save@v4
+        with:
+          path: data/mtf
+          key: academy-mtf-world-${{ github.run_id }}
+
+      - name: Upload one immutable world snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: academy-world-v04-${{ github.run_id }}
+          path: |
+            data/processed
+            data/mtf
+            migration
+          retention-days: 2
+
+  train-students:
+    needs: prepare-world
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        student: ${{ fromJSON(needs.prepare-world.outputs.students) }}
+
+    env:
+      STUDENT_ID: ${{ matrix.student }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install
+        run: pip install -r requirements.txt
+
+      - name: Download identical market world
+        uses: actions/download-artifact@v4
+        with:
+          name: academy-world-v04-${{ github.run_id }}
+          path: .
+
+      - name: Restore independent Student ${{ matrix.student }}
+        uses: actions/cache/restore@v4
+        with:
+          path: students/${{ matrix.student }}
+          key: academy-v04-student-${{ matrix.student }}-${{ github.run_id }}
+          restore-keys: |
+            academy-v04-student-${{ matrix.student }}-
+            academy-student-${{ matrix.student }}-
+
+      - name: Train Student ${{ matrix.student }}
+        run: python scripts/cohort_train.py
+
+      - name: Policy Autopsy
+        run: python scripts/policy_autopsy.py
+
+      - name: Build Student summary
+        run: python scripts/student_summary.py
+
+      - name: Save independent Student ${{ matrix.student }}
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: students/${{ matrix.student }}
+          key: academy-v04-student-${{ matrix.student }}-${{ github.run_id }}
+
+      - name: Upload Student ${{ matrix.student }} report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: student-${{ matrix.student }}-${{ github.run_number }}
+          path: |
+            students/${{ matrix.student }}/reports
+            students/${{ matrix.student }}/models/best_validation.json
+            students/${{ matrix.student }}/models/master_candidate.json
+          if-no-files-found: warn
+          retention-days: 90
+
+  leaderboard:
+    needs: [prepare-world, train-students]
+    if: always() && needs.prepare-world.result == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: student-*-${{ github.run_number }}
+          path: cohort-artifacts
+          merge-multiple: false
+
+      - name: Build leaderboard
+        run: python scripts/build_leaderboard.py
+
+      - name: Upload whole Academy report
+        uses: actions/upload-artifact@v4
+        with:
+          name: academy-market-cohort-${{ github.run_number }}
+          path: |
+            reports/cohort
+            cohort-artifacts
+          retention-days: 90
+
+      - name: Decide whether Cohort continues
+        id: decision
+        env:
+          COHORT_TARGET_TIMESTEPS: ${{ inputs.target_total_timesteps }}
+          COHORT_STUDENT_COUNT: ${{ inputs.student_count }}
+          COHORT_AUTO_CONTINUE: ${{ inputs.auto_continue }}
+        run: python scripts/cohort_decision.py
+
+      - name: Queue next Cohort round
+        if: ${{ steps.decision.outputs.continue == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET: ${{ inputs.target_total_timesteps }}
+          STUDENT_COUNT: ${{ inputs.student_count }}
+        run: |
+          curl --fail-with-body -L \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/cohort.yml/dispatches" \
+            -d "{\"ref\":\"${GITHUB_REF_NAME}\",\"inputs\":{\"student_count\":\"${STUDENT_COUNT}\",\"target_total_timesteps\":\"${TARGET}\",\"auto_continue\":\"true\",\"continuation\":\"true\"}}"
+
+      - name: Cohort stop reason
+        if: ${{ steps.decision.outputs.continue != 'true' }}
+        run: |
+          echo "v0.4 Market Cohort chain stopped."
+          echo "FINAL EXAM remains manual."

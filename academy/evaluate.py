@@ -2,13 +2,14 @@ from __future__ import annotations
 import numpy as np
 from stable_baselines3 import PPO
 from .env import TradingAcademyEnv
+from .mtf_env import MultiTimeframeTradingEnv
 from .metrics import summarize_episode_infos
 
 
-def evaluate_model(model: PPO, frames: dict, rules: dict, episodes: int, seed: int = 1000) -> dict:
+def _evaluate(env_builder, model: PPO, episodes: int, seed: int) -> dict:
     results = []
     for ep in range(episodes):
-        env = TradingAcademyEnv(frames, rules, seed=seed + ep, random_start=True)
+        env = env_builder(seed + ep)
         obs, _ = env.reset(seed=seed + ep)
         done = False
         max_dd = 0.0
@@ -27,6 +28,32 @@ def evaluate_model(model: PPO, frames: dict, rules: dict, episodes: int, seed: i
             "trade_pnls": list(env.trade_pnls),
         })
     return summarize_episode_infos(results)
+
+
+def evaluate_model(model: PPO, frames: dict, rules: dict, episodes: int, seed: int = 1000) -> dict:
+    return _evaluate(
+        lambda s: TradingAcademyEnv(frames, rules, seed=s, random_start=True),
+        model, episodes, seed,
+    )
+
+
+def evaluate_mtf_model(
+    model: PPO,
+    frames: dict,
+    rules: dict,
+    timeframes: list[str],
+    windows: dict[str, int],
+    decision_bar: str,
+    episodes: int,
+    seed: int = 1000,
+) -> dict:
+    return _evaluate(
+        lambda s: MultiTimeframeTradingEnv(
+            frames, rules, timeframes=timeframes, windows=windows,
+            decision_bar=decision_bar, seed=s, random_start=True
+        ),
+        model, episodes, seed,
+    )
 
 
 def passes_candidate_gate(metrics: dict, cfg: dict) -> bool:

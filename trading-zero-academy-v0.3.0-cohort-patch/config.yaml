@@ -1,40 +1,18 @@
 project:
   name: Trading Zero Academy
   seed: 42
-
 market:
   exchange: OKX
   instrument_type: SWAP
-
-  # Student #1 keeps the original M5-only world as an immutable baseline.
   bar: 5m
-
-  # Students #2+ are Market Students. They see all of these raw candle scales
-  # simultaneously. M5 remains only the decision/execution clock.
-  decision_bar: 5m
-  multi_timeframes:
-    - 1m
-    - 5m
-    - 15m
-    - 1H
-    - 4H
-  multi_timeframe_windows:
-    1m: 60
-    5m: 96
-    15m: 64
-    1H: 48
-    4H: 24
-
   symbols:
-    - BTC-USDT-SWAP
-    - ETH-USDT-SWAP
-    - SOL-USDT-SWAP
-    - XRP-USDT-SWAP
-    - SUI-USDT-SWAP
-
-  candle_limit_per_request: 300
+  - BTC-USDT-SWAP
+  - ETH-USDT-SWAP
+  - SOL-USDT-SWAP
+  - XRP-USDT-SWAP
+  - SUI-USDT-SWAP
+  candle_limit_per_request: 100
   history_days: 180
-
 world_rules:
   starting_equity: 100.0
   max_leverage: 10.0
@@ -46,7 +24,6 @@ world_rules:
   max_episode_bars: 2016
   observation_window: 96
   max_position_fraction: 1.0
-
 learner:
   algorithm: PPO
   timesteps_per_block: 500000
@@ -59,22 +36,15 @@ learner:
   ent_coef: 0.01
   clip_range: 0.2
   policy_layers:
-    - 256
-    - 256
-
+  - 256
+  - 256
   marathon_target_total_timesteps: 123000000
   marathon_steps_per_run: 10000000
   marathon_validation_interval_blocks: 4
   marathon_master_candidate_streak: 3
   marathon_stop_on_master_streak: true
-
-  # Baseline Student #1 can still do 10M per cohort round.
   cohort_steps_per_round: 10000000
-  # Multi-timeframe observations are heavier. 4M keeps each GitHub job safely
-  # below the hosted-runner job timeout while still validating every 2M.
-  cohort_mtf_steps_per_round: 4000000
   cohort_target_total_timesteps: 500000000
-
 evaluation:
   train_fraction: 0.7
   validation_fraction: 0.15
@@ -91,7 +61,6 @@ evaluation:
   candidate_min_profit_factor: 1.05
   final_test_unlock_file: reports/FINAL_TEST_UNLOCK
   autopsy_episodes: 10
-
 runtime:
   checkpoint_path: models/latest.zip
   training_state_path: models/training_state.json
