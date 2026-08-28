@@ -96,7 +96,17 @@ jobs:
             academy-world-v04-
             academy-world-
 
-      - name: Restore legacy Marathon world + Student #1 for first migration
+      - name: Restore current v0.4 Student #1 checkpoint for safe manual resume
+        if: ${{ !inputs.continuation }}
+        uses: actions/cache/restore@v4
+        with:
+          path: students/001
+          key: academy-v04-student-001-${{ github.run_id }}
+          restore-keys: |
+            academy-v04-student-001-
+            academy-student-001-
+
+      - name: Restore legacy Marathon world + Student #1 for first migration fallback
         if: ${{ !inputs.continuation }}
         uses: actions/cache/restore@v4
         with:
@@ -108,18 +118,28 @@ jobs:
           restore-keys: |
             academy-marathon-
 
-      - name: Verify Student #1 migration source exists
+      - name: Verify Student #1 resume source exists
         if: ${{ !inputs.continuation }}
         run: |
-          test -f models/latest.zip || {
-            echo 'STOP: final Marathon Student #1 was not restored. Refusing to replace it.'
-            exit 1
-          }
-          python - <<'PY'
+          if [ -f students/001/models/latest.zip ]; then
+            echo 'Student #1: current v0.4 checkpoint restored. Legacy Marathon cache is not required.'
+            python - <<'PY'
+          from stable_baselines3 import PPO
+          m=PPO.load('students/001/models/latest.zip')
+          print(f'Student #1 current v0.4 checkpoint: {m.num_timesteps:,} timesteps')
+          PY
+          elif [ -f models/latest.zip ]; then
+            echo 'Student #1: using legacy Marathon checkpoint as migration fallback.'
+            python - <<'PY'
           from stable_baselines3 import PPO
           m=PPO.load('models/latest.zip')
-          print(f'Student #1 migration source: {m.num_timesteps:,} timesteps')
+          print(f'Student #1 legacy migration source: {m.num_timesteps:,} timesteps')
           PY
+          else
+            echo 'STOP: neither the current v0.4 Student #1 cache nor the legacy Marathon checkpoint was restored.'
+            echo 'Refusing to create a replacement Student #1 from zero.'
+            exit 1
+          fi
 
       - name: Refresh original M5 baseline world
         run: python scripts/download_data.py
@@ -135,14 +155,30 @@ jobs:
       - name: Build / refresh raw M1→M5/M15/H1/H4 world
         run: python scripts/download_mtf_data.py
 
-      - name: Prepare one-time Student #1 migration bundle
+      - name: Prepare safe Student #1 resume bundle
         run: |
           mkdir -p migration/student1/models
-          if [ -f models/latest.zip ]; then
+
+          # Preferred source: the latest v0.4 Student #1 cache.
+          # This is what allows a manual workflow run after Student #1 has already
+          # migrated from the old Marathon workflow (and even after the old
+          # Marathon cache has expired).
+          if [ -f students/001/models/latest.zip ]; then
+            cp -a students/001/models/. migration/student1/models/
+            if [ -f students/001/reports/learning_history.csv ]; then
+              cp students/001/reports/learning_history.csv migration/student1/learning_history.csv
+            fi
+            echo 'Prepared Student #1 resume bundle from current v0.4 cache.'
+
+          # First-ever migration fallback only.
+          elif [ -f models/latest.zip ]; then
             cp -a models/. migration/student1/models/
-          fi
-          if [ -f reports/learning_history.csv ]; then
-            cp reports/learning_history.csv migration/student1/learning_history.csv
+            if [ -f reports/learning_history.csv ]; then
+              cp reports/learning_history.csv migration/student1/learning_history.csv
+            fi
+            echo 'Prepared Student #1 resume bundle from legacy Marathon cache.'
+          else
+            echo 'No Student #1 source available for resume bundle.'
           fi
 
       - name: Save M5 world cache
