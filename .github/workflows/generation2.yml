@@ -35,6 +35,9 @@ concurrency:
   group: trading-zero-generation2
   cancel-in-progress: false
 
+env:
+  PYTHONPATH: ${{ github.workspace }}
+
 jobs:
   prepare-world:
     runs-on: ubuntu-latest

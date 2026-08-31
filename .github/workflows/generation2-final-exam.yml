@@ -12,6 +12,9 @@ on:
 permissions:
   contents: read
 
+env:
+  PYTHONPATH: ${{ github.workspace }}
+
 jobs:
   final-exam:
     runs-on: ubuntu-latest
