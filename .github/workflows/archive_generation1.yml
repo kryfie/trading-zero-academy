@@ -1,0 +1,98 @@
+name: Trading Zero Academy — Archive Generation 1
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  archive-students:
+    name: Archive Student ${{ matrix.student }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        student: ['001','002','003','004','005','006','007','008']
+
+    steps:
+      - name: Restore final v0.4 Student ${{ matrix.student }} cache
+        uses: actions/cache/restore@v4
+        with:
+          path: students/${{ matrix.student }}
+          key: gen1-archive-student-${{ matrix.student }}-${{ github.run_id }}
+          restore-keys: |
+            academy-v04-student-${{ matrix.student }}-
+            academy-student-${{ matrix.student }}-
+
+      - name: Verify model cache exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Archiving Student ${{ matrix.student }}"
+          test -f students/${{ matrix.student }}/models/latest.zip || {
+            echo "ERROR: latest.zip was not restored for Student ${{ matrix.student }}"
+            exit 1
+          }
+          test -f students/${{ matrix.student }}/models/best_validation.zip || {
+            echo "ERROR: best_validation.zip was not restored for Student ${{ matrix.student }}"
+            exit 1
+          }
+          ls -lah students/${{ matrix.student }}/models
+          echo "Reports:"
+          find students/${{ matrix.student }}/reports -maxdepth 1 -type f -printf '%f\n' 2>/dev/null | sort || true
+
+      - name: Upload frozen Student ${{ matrix.student }} archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: gen1-student-${{ matrix.student }}
+          path: |
+            students/${{ matrix.student }}/models/*.zip
+            students/${{ matrix.student }}/models/*.json
+            students/${{ matrix.student }}/reports
+          if-no-files-found: error
+          retention-days: 90
+
+  build-generation-archive:
+    name: Build Generation 1 archive
+    needs: archive-students
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all frozen Student archives
+        uses: actions/download-artifact@v4
+        with:
+          pattern: gen1-student-*
+          path: generation1/students
+          merge-multiple: false
+
+      - name: Add Generation 1 verdict
+        shell: bash
+        run: |
+          mkdir -p generation1
+          if [ -f GENERATION_1_FINAL.md ]; then
+            cp GENERATION_1_FINAL.md generation1/GENERATION_1_FINAL.md
+          fi
+          cat > generation1/ARCHIVE_README.txt <<'EOF'
+Trading Zero Academy — Generation 1 frozen archive
+
+This archive is for preservation only. It does not train or evaluate models.
+It contains the final/latest and best-validation model files and reports restored
+from the final v0.4 student caches.
+
+IMPORTANT: Student #1's true legacy best checkpoint at ~13.2M timesteps predates
+v0.4 and is NOT guaranteed to be represented by the v0.4 best_validation.zip.
+Keep the separate academy-marathon-16.zip (or an extracted copy of its
+models/best_validation.zip) as Student #1 LEGACY BEST.
+EOF
+          find generation1 -maxdepth 4 -type f | sort
+
+      - name: Upload one frozen Generation 1 package
+        uses: actions/upload-artifact@v4
+        with:
+          name: trading-zero-academy-generation1-final
+          path: generation1
+          if-no-files-found: error
+          retention-days: 90
