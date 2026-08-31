@@ -76,17 +76,17 @@ jobs:
             cp GENERATION_1_FINAL.md generation1/GENERATION_1_FINAL.md
           fi
           cat > generation1/ARCHIVE_README.txt <<'EOF'
-Trading Zero Academy — Generation 1 frozen archive
+          Trading Zero Academy — Generation 1 frozen archive
 
-This archive is for preservation only. It does not train or evaluate models.
-It contains the final/latest and best-validation model files and reports restored
-from the final v0.4 student caches.
+          This archive is for preservation only. It does not train or evaluate models.
+          It contains the final/latest and best-validation model files and reports restored
+          from the final v0.4 student caches.
 
-IMPORTANT: Student #1's true legacy best checkpoint at ~13.2M timesteps predates
-v0.4 and is NOT guaranteed to be represented by the v0.4 best_validation.zip.
-Keep the separate academy-marathon-16.zip (or an extracted copy of its
-models/best_validation.zip) as Student #1 LEGACY BEST.
-EOF
+          IMPORTANT: Student #1's true legacy best checkpoint at ~13.2M timesteps predates
+          v0.4 and is NOT guaranteed to be represented by the v0.4 best_validation.zip.
+          Keep the separate academy-marathon-16.zip (or an extracted copy of its
+          models/best_validation.zip) as Student #1 LEGACY BEST.
+          EOF
           find generation1 -maxdepth 4 -type f | sort
 
       - name: Upload one frozen Generation 1 package
