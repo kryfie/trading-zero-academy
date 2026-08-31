@@ -24,15 +24,11 @@ for sid in range(1, student_count + 1):
         unfinished.append(sid)
 
 cont = bool(auto_continue and unfinished)
-
 out = Path(os.environ.get("GITHUB_OUTPUT", "/tmp/github_output"))
 with out.open("a", encoding="utf-8") as f:
     f.write(f"continue={'true' if cont else 'false'}\n")
-    f.write(f"target={target}\n")
     f.write(f"unfinished={','.join(map(str, unfinished))}\n")
 
-print(f"Target per student: {target:,}")
-print(f"Expected students: {student_count}")
-print(f"Student summaries found: {len(summaries)}")
+print(f"Generation 2 target/student: {target:,}")
 print(f"Unfinished/missing students: {unfinished}")
 print(f"Auto-continue: {cont}")

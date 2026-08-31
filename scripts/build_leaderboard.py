@@ -12,7 +12,6 @@ for p in root.rglob("student_summary.json"):
     except Exception as exc:
         print(f"Skipping {p}: {exc}")
 
-
 def score(x):
     b = x.get("best_validation") or {}
     return (
@@ -26,17 +25,19 @@ out_dir = Path("reports/cohort")
 out_dir.mkdir(parents=True, exist_ok=True)
 
 leaderboard = {
+    "generation": 2,
+    "experiment": "PPO+MLP raw MTF, discrete target-position actions -10..+10",
     "students": len(summaries),
     "master_candidates": [x["student"] for x in summaries if x.get("status") == "MASTER_CANDIDATE"],
     "ranking": summaries,
-    "final_exam": "LOCKED",
+    "final_exam": "LOCKED_UNLESS_MASTER_CANDIDATE",
 }
 (out_dir / "leaderboard.json").write_text(json.dumps(leaderboard, indent=2), encoding="utf-8")
 
 fields = [
-    "rank", "student", "student_mode", "status", "total_timesteps", "candidate_streak",
-    "best_step", "best_median_return_pct", "best_profit_factor", "best_median_max_drawdown_pct",
-    "best_profitable_episode_ratio",
+    "rank", "student", "status", "total_timesteps", "candidate_streak",
+    "best_step", "best_median_return_pct", "best_profit_factor",
+    "best_median_max_drawdown_pct", "best_profitable_episode_ratio",
 ]
 with (out_dir / "leaderboard.csv").open("w", newline="", encoding="utf-8") as f:
     w = csv.DictWriter(f, fieldnames=fields)
@@ -46,7 +47,6 @@ with (out_dir / "leaderboard.csv").open("w", newline="", encoding="utf-8") as f:
         w.writerow({
             "rank": rank,
             "student": x.get("student"),
-            "student_mode": x.get("student_mode"),
             "status": x.get("status"),
             "total_timesteps": x.get("total_timesteps", 0),
             "candidate_streak": x.get("candidate_streak", 0),
@@ -57,11 +57,11 @@ with (out_dir / "leaderboard.csv").open("w", newline="", encoding="utf-8") as f:
             "best_profitable_episode_ratio": b.get("profitable_episode_ratio"),
         })
 
-print("TRADING ZERO ACADEMY — COHORT LEADERBOARD")
+print("TRADING ZERO ACADEMY — GENERATION 2 LEADERBOARD")
 for rank, x in enumerate(summaries, 1):
     b = x.get("best_validation") or {}
     print(
-        f"#{rank:02d} Student {int(x.get('student', 0)):03d} | {x.get('student_mode')} | {x.get('status')} | "
+        f"#{rank:02d} Student {int(x.get('student', 0)):03d} | {x.get('status')} | "
         f"steps={int(x.get('total_timesteps', 0)):,} | "
         f"best@{int(b.get('total_timesteps') or 0):,} | "
         f"median={float(b.get('median_return_pct', 0.0)):.2f}% | "
@@ -69,4 +69,3 @@ for rank, x in enumerate(summaries, 1):
         f"DD={float(b.get('median_max_drawdown_pct', 0.0)):.2f}%"
     )
 print(f"MASTER_CANDIDATES: {leaderboard['master_candidates'] or 'none'}")
-print("FINAL EXAM: LOCKED")

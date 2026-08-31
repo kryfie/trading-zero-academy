@@ -14,9 +14,11 @@ autopsy = load_json(p["autopsy_json"], {}) or {}
 master = load_json(p["master_candidate_metrics"], None)
 
 out = {
+    "generation": 2,
     "student": sid,
     "student_seed": status.get("student_seed"),
-    "student_mode": status.get("student_mode", "M5_ONLY_BASELINE" if sid == 1 else "RAW_MTF"),
+    "seed_reference_generation1_student": status.get("seed_reference_generation1_student"),
+    "student_mode": "GEN2_RAW_MTF_DISCRETE",
     "status": status.get("status", "UNKNOWN"),
     "total_timesteps": status.get("total_timesteps", 0),
     "candidate_streak": status.get("candidate_streak", 0),

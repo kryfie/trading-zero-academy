@@ -1,15 +1,33 @@
 from __future__ import annotations
-import numpy as np
+
 from stable_baselines3 import PPO
-from .env import TradingAcademyEnv
-from .mtf_env import MultiTimeframeTradingEnv
+
+from .gen2_env import Generation2TradingEnv
 from .metrics import summarize_episode_infos
 
 
-def _evaluate(env_builder, model: PPO, episodes: int, seed: int) -> dict:
+def evaluate_model(
+    model: PPO,
+    frames: dict,
+    rules: dict,
+    timeframes: list[str],
+    windows: dict[str, int],
+    decision_bar: str,
+    target_levels: tuple[int, ...],
+    episodes: int,
+    seed: int,
+) -> dict:
     results = []
-    for ep in range(episodes):
-        env = env_builder(seed + ep)
+    for ep in range(int(episodes)):
+        env = Generation2TradingEnv(
+            frames, rules,
+            timeframes=timeframes,
+            windows=windows,
+            decision_bar=decision_bar,
+            target_levels=target_levels,
+            seed=seed + ep,
+            random_start=True,
+        )
         obs, _ = env.reset(seed=seed + ep)
         done = False
         max_dd = 0.0
@@ -28,32 +46,6 @@ def _evaluate(env_builder, model: PPO, episodes: int, seed: int) -> dict:
             "trade_pnls": list(env.trade_pnls),
         })
     return summarize_episode_infos(results)
-
-
-def evaluate_model(model: PPO, frames: dict, rules: dict, episodes: int, seed: int = 1000) -> dict:
-    return _evaluate(
-        lambda s: TradingAcademyEnv(frames, rules, seed=s, random_start=True),
-        model, episodes, seed,
-    )
-
-
-def evaluate_mtf_model(
-    model: PPO,
-    frames: dict,
-    rules: dict,
-    timeframes: list[str],
-    windows: dict[str, int],
-    decision_bar: str,
-    episodes: int,
-    seed: int = 1000,
-) -> dict:
-    return _evaluate(
-        lambda s: MultiTimeframeTradingEnv(
-            frames, rules, timeframes=timeframes, windows=windows,
-            decision_bar=decision_bar, seed=s, random_start=True
-        ),
-        model, episodes, seed,
-    )
 
 
 def passes_candidate_gate(metrics: dict, cfg: dict) -> bool:

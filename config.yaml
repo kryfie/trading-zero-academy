@@ -1,16 +1,11 @@
 project:
-  name: Trading Zero Academy
+  name: Trading Zero Academy — Generation 2
+  generation: 2
   seed: 42
 
 market:
   exchange: OKX
   instrument_type: SWAP
-
-  # Student #1 keeps the original M5-only world as an immutable baseline.
-  bar: 5m
-
-  # Students #2+ are Market Students. They see all of these raw candle scales
-  # simultaneously. M5 remains only the decision/execution clock.
   decision_bar: 5m
   multi_timeframes:
     - 1m
@@ -24,33 +19,38 @@ market:
     15m: 64
     1H: 48
     4H: 24
-
   symbols:
     - BTC-USDT-SWAP
     - ETH-USDT-SWAP
     - SOL-USDT-SWAP
     - XRP-USDT-SWAP
     - SUI-USDT-SWAP
-
   candle_limit_per_request: 300
-  history_days: 180
+  frozen_partition_reference: data/manifests/generation1_partition_reference.json
 
 world_rules:
   starting_equity: 100.0
-  max_leverage: 10.0
+  max_leverage: 10
   taker_fee_rate: 0.0008
   base_slippage_bps: 1.0
   volatility_slippage_multiplier: 0.15
-  liquidation_buffer: 0.003
   min_equity: 1.0
   max_episode_bars: 2016
-  observation_window: 96
   max_position_fraction: 1.0
+
+action_space:
+  type: DISCRETE_TARGET_POSITION
+  min_target_leverage: -10
+  max_target_leverage: 10
+  step: 1
 
 learner:
   algorithm: PPO
+  policy: MlpPolicy
   timesteps_per_block: 500000
-  blocks_per_run: 4
+  validation_interval_blocks: 4
+  steps_per_round: 4000000
+  target_total_timesteps: 500000000
   learning_rate: 0.0003
   n_steps: 2048
   batch_size: 256
@@ -61,43 +61,13 @@ learner:
   policy_layers:
     - 256
     - 256
-
-  marathon_target_total_timesteps: 123000000
-  marathon_steps_per_run: 10000000
-  marathon_validation_interval_blocks: 4
-  marathon_master_candidate_streak: 3
-  marathon_stop_on_master_streak: true
-
-  # Baseline Student #1 can still do 10M per cohort round.
-  cohort_steps_per_round: 10000000
-  # Multi-timeframe observations are heavier. 4M keeps each GitHub job safely
-  # below the hosted-runner job timeout while still validating every 2M.
-  cohort_mtf_steps_per_round: 4000000
-  cohort_target_total_timesteps: 500000000
+  master_candidate_streak: 3
 
 evaluation:
-  train_fraction: 0.7
-  validation_fraction: 0.15
-  final_test_fraction: 0.15
-  live_shadow_days: 7
-  train_maturation_days: 30
-  min_rolling_validation_bars: 2016
   validation_episodes: 30
-  live_shadow_episodes: 10
   candidate_min_episodes: 20
   candidate_min_median_return_pct: 2.0
   candidate_max_median_drawdown_pct: 20.0
   candidate_min_profitable_episode_ratio: 0.55
   candidate_min_profit_factor: 1.05
-  final_test_unlock_file: reports/FINAL_TEST_UNLOCK
   autopsy_episodes: 10
-
-runtime:
-  checkpoint_path: models/latest.zip
-  training_state_path: models/training_state.json
-  vecnorm_path: models/vecnormalize.pkl
-  status_path: reports/status.json
-  progress_path: reports/progress.json
-  learning_history_path: reports/learning_history.csv
-  best_checkpoint_path: models/best_validation.zip
-  best_metrics_path: models/best_validation.json

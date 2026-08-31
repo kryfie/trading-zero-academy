@@ -1,54 +1,105 @@
-# Trading Zero Academy v0.4.0
+# Trading Zero Academy — Generation 2
 
-See `MARKET_STUDENTS_v0.4.md` for the Market Student design.
+Generation 2 is a new, frozen experiment. It does **not** continue Generation 1 weights.
 
-# Trading Zero Academy
+## Research question
 
-AlphaZero-inspired autonomous trading research lab for OKX perpetual futures.
+Can PPO + MLP learn profitable raw multi-timeframe trading when the continuous
+position-control output from Generation 1 is replaced by a discrete target-position
+action space?
 
-Current mode: **v0.3.0 Cohort + Policy Autopsy**.
+Generation 1 showed a repeated pathology: later policies often increased turnover,
+fees and slippage dramatically. Generation 2 changes only the action representation.
 
-## Fixed world rules
+## What changed
 
-- OKX perpetual futures (`SWAP`)
-- M5 market data
-- maximum leverage x10
-- taker fee assumption 0.08% per executed turnover
-- historical funding events
-- deterministic volatility-aware slippage model
-- no RSI, MA, Heikin Ashi, fixed RR, SL/TP, or hand-authored entry strategy
+Generation 1 RAW_MTF action:
+- continuous side output
+- continuous leverage output
+- tiny output drift could resize the position and generate turnover
 
-The learner sees market/portfolio state and learns a policy from reward. Human analysis may inspect behavior, but audit results are never fed back into the learner.
+Generation 2 action:
+- one categorical target position from `-10, -9, ..., 0, ..., +9, +10`
+- `0` = FLAT
+- negative = SHORT at that leverage
+- positive = LONG at that leverage
+- repeating the same target is a true HOLD and creates zero resize turnover
 
-## Cohort mode
+Example:
+- current `LONG x4`, next action `LONG x4` -> HOLD, no fee/slippage from resizing
+- current `LONG x4`, next action `LONG x5` -> turnover 1x
+- current `LONG x4`, next action `SHORT x4` -> turnover 8x
 
-`.github/workflows/cohort.yml` manages a class of independent students.
+## What did NOT change
 
-Default first cohort:
+- PPO
+- MLP (`MlpPolicy`)
+- raw M1/M5/M15/H1/H4 observations
+- M5 decision clock
+- five OKX perpetual markets
+- max leverage x10
+- taker fee 0.08%
+- slippage model
+- funding
+- reward
+- validation gates
+- 30 validation episodes
+- 3 consecutive MASTER_CANDIDATE passes
+- FINAL TEST remains untouched unless a candidate qualifies
+- 500M hard ceiling per student
 
-- Student #1 continues from the completed legacy Marathon checkpoint.
-- Students #2–#8 start from zero.
-- each student gets an independent seed and private checkpoint/cache namespace;
-- every student receives the same market-world snapshot;
-- checkpoint about every 500k requested timesteps;
-- validation about every 2M requested timesteps;
-- BEST checkpoint retained separately from LATEST;
-- first 3x consecutive MASTER_CANDIDATE checkpoint is frozen for a future Final Exam;
-- Policy Autopsy compares BEST vs LATEST on identical validation episodes;
-- one combined cohort artifact contains the leaderboard and all student reports.
+## Market data
 
-See `COHORT_MODE.md` for migration and operating details.
+Generation 2 reuses the exact TRAIN / VALIDATION / FROZEN FINAL eras recorded at
+Generation 1 Cohort #129.
 
-## Data isolation
+`data/manifests/generation1_partition_reference.json`
 
-The original FINAL TEST interval is frozen forever and never enters training, rolling validation, leaderboard, or Policy Autopsy.
+Before training starts, the workflow hard-verifies row counts and timestamp
+boundaries for every symbol and every timeframe. If the world differs, training stops.
 
-New post-launch data passes through:
+No new bars mature into TRAIN during Generation 2. No rolling validation is used.
+This keeps the action-space comparison clean.
 
-`LIVE SHADOW -> ROLLING VALIDATION -> TRAIN after maturation`
+## Students
 
-The Final Exam is manual and student-specific. It refuses to run unless that student already has a frozen 3x `MASTER_CANDIDATE` checkpoint.
+Eight new students start from zero.
 
-## Important
+Gen2 #001..#007 intentionally reuse the random-seed identities of Gen1 RAW_MTF
+#002..#008. Gen2 #008 uses the next unused seed. This gives seven seed-matched
+comparisons.
 
-Do not start Cohort mode while the legacy Student #1 Marathon is still chaining. Let the current Marathon reach its target and stop first, then apply v0.3.0 and run **Trading Zero Academy — Cohort**.
+No Generation 1 model weights are loaded.
+
+## Run protocol
+
+First manual run:
+1. Actions -> `Trading Zero Academy — Generation 2`
+2. `Run workflow`
+3. Set `run_mode = start`
+4. Leave:
+   - students = 8
+   - target = 500000000
+   - auto_continue = true
+
+Every automatically queued run uses `run_mode = resume`.
+
+Safety: if a resume run cannot restore a student's Gen2 checkpoint, it fails rather
+than silently recreating that student from zero.
+
+## Stop rule
+
+500M per student is a hard ceiling.
+
+If no MASTER_CANDIDATE exists at 500M:
+`GENERATION 2 = FAILED`.
+
+Do not extend to 750M/1B. The predetermined next experiment is Generation 3
+(sequence memory), not another Gen2 tweak.
+
+## FINAL TEST
+
+Run `Trading Zero Final Exam — Generation 2` only for a student that has already
+frozen a 3x `MASTER_CANDIDATE`.
+
+The script itself refuses to run FINAL without that checkpoint.
