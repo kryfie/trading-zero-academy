@@ -1,0 +1,294 @@
+{
+  "source_artifact": "academy-generation2-cohort-128.zip",
+  "generation": 2,
+  "experiment": "PPO+MLP raw MTF, discrete target-position actions -10..+10",
+  "master_candidates": [],
+  "students": [
+    {
+      "student": 1,
+      "total_timesteps": 500002816,
+      "candidate_streak": 0,
+      "current_median_return_pct": -76.76031041216027,
+      "current_profit_factor": 0.3624055360803233,
+      "current_median_dd_pct": 76.76192622766092,
+      "best_step": 474226688,
+      "best_median_return_pct": -74.67209129174174,
+      "best_profit_factor": 0.3794719154246342,
+      "best_median_dd_pct": 74.68398714024372,
+      "best_profitable_episode_ratio": 0.0,
+      "autopsy_comparison": {
+        "best_minus_latest": {
+          "median_return_pct": 3.8145256579164624,
+          "median_max_drawdown_pct": -3.8401509232878794,
+          "flat_bar_pct": -1.4087301587301582,
+          "hold_action_pct": 1.4831349206349245,
+          "position_change_action_pct": -1.4831349206349245,
+          "avg_active_leverage": -0.005649354919628147,
+          "entries_per_episode": -13.700000000000045,
+          "reversals_per_episode": 4.3999999999999915,
+          "turnover_leverage_units_per_episode": -42.100000000000136,
+          "fees_pct_per_episode": -1.165638590609106,
+          "slippage_pct_per_episode": -0.7545582114458185,
+          "funding_paid_pct_per_episode": -0.002195499595469031,
+          "gross_market_pnl_pct_per_episode": -0.024567631773560583,
+          "avg_holding_bars": 0.12466785756795407
+        },
+        "evidence": [
+          "BEST had materially lower turnover than LATEST.",
+          "BEST paid materially less fees per episode than LATEST."
+        ]
+      }
+    },
+    {
+      "student": 2,
+      "total_timesteps": 500002816,
+      "candidate_streak": 0,
+      "current_median_return_pct": -87.36527900898719,
+      "current_profit_factor": 0.22845840144127447,
+      "current_median_dd_pct": 87.37535026875241,
+      "best_step": 245649408,
+      "best_median_return_pct": -71.83222678352055,
+      "best_profit_factor": 0.3439136391796751,
+      "best_median_dd_pct": 71.85571482114909,
+      "best_profitable_episode_ratio": 0.0,
+      "autopsy_comparison": {
+        "best_minus_latest": {
+          "median_return_pct": 11.63349389887587,
+          "median_max_drawdown_pct": -11.660612971600216,
+          "flat_bar_pct": 14.791666666666671,
+          "hold_action_pct": 11.686507936507937,
+          "position_change_action_pct": -11.686507936507937,
+          "avg_active_leverage": -0.12266174382112238,
+          "entries_per_episode": 35.5,
+          "reversals_per_episode": -158.3,
+          "turnover_leverage_units_per_episode": -583.6000000000001,
+          "fees_pct_per_episode": -8.590847250265412,
+          "slippage_pct_per_episode": -4.28321092418566,
+          "funding_paid_pct_per_episode": 0.00942041221145212,
+          "gross_market_pnl_pct_per_episode": -0.5382086324324284,
+          "avg_holding_bars": -0.025543799378672905
+        },
+        "evidence": [
+          "BEST had materially lower turnover than LATEST.",
+          "BEST paid materially less fees per episode than LATEST.",
+          "BEST repeated its existing target position materially more often than LATEST."
+        ]
+      }
+    },
+    {
+      "student": 3,
+      "total_timesteps": 500002816,
+      "candidate_streak": 0,
+      "current_median_return_pct": -88.20855874878296,
+      "current_profit_factor": 0.20974654975691606,
+      "current_median_dd_pct": 88.22193990162447,
+      "best_step": 211619840,
+      "best_median_return_pct": -78.163591616324,
+      "best_profit_factor": 0.2657633125266482,
+      "best_median_dd_pct": 78.19855010403887,
+      "best_profitable_episode_ratio": 0.0,
+      "autopsy_comparison": {
+        "best_minus_latest": {
+          "median_return_pct": 11.477513604030904,
+          "median_max_drawdown_pct": -11.478435702947692,
+          "flat_bar_pct": 21.6468253968254,
+          "hold_action_pct": 13.54662698412698,
+          "position_change_action_pct": -13.54662698412698,
+          "avg_active_leverage": 0.019916136450089716,
+          "entries_per_episode": 1.3000000000000114,
+          "reversals_per_episode": -220.20000000000002,
+          "turnover_leverage_units_per_episode": -609.7,
+          "fees_pct_per_episode": -7.84791644246345,
+          "slippage_pct_per_episode": -4.001668838202722,
+          "funding_paid_pct_per_episode": 0.016355150842745976,
+          "gross_market_pnl_pct_per_episode": -1.1051626031538995,
+          "avg_holding_bars": 0.0729763613398533
+        },
+        "evidence": [
+          "BEST had materially lower turnover than LATEST.",
+          "BEST paid materially less fees per episode than LATEST.",
+          "BEST repeated its existing target position materially more often than LATEST."
+        ]
+      }
+    },
+    {
+      "student": 4,
+      "total_timesteps": 500002816,
+      "candidate_streak": 0,
+      "current_median_return_pct": -88.49319912060892,
+      "current_profit_factor": 0.2541946062428812,
+      "current_median_dd_pct": 88.49927157202407,
+      "best_step": 276123648,
+      "best_median_return_pct": -80.12745242410179,
+      "best_profit_factor": 0.3044541499956853,
+      "best_median_dd_pct": 80.13774727469523,
+      "best_profitable_episode_ratio": 0.0,
+      "autopsy_comparison": {
+        "best_minus_latest": {
+          "median_return_pct": 8.044950819087077,
+          "median_max_drawdown_pct": -8.089451797226658,
+          "flat_bar_pct": 16.11607142857143,
+          "hold_action_pct": 4.8660714285714235,
+          "position_change_action_pct": -4.8660714285714235,
+          "avg_active_leverage": -0.12934561685114598,
+          "entries_per_episode": 161.49999999999997,
+          "reversals_per_episode": -232.8,
+          "turnover_leverage_units_per_episode": -496.5,
+          "fees_pct_per_episode": -6.3366241988448735,
+          "slippage_pct_per_episode": -3.8030043282955894,
+          "funding_paid_pct_per_episode": 0.014763014528773974,
+          "gross_market_pnl_pct_per_episode": -1.8359356314516337,
+          "avg_holding_bars": -0.21614057360493977
+        },
+        "evidence": [
+          "BEST had materially lower turnover than LATEST.",
+          "BEST paid materially less fees per episode than LATEST."
+        ]
+      }
+    },
+    {
+      "student": 5,
+      "total_timesteps": 500002816,
+      "candidate_streak": 0,
+      "current_median_return_pct": -81.28780967900147,
+      "current_profit_factor": 0.3254234513179896,
+      "current_median_dd_pct": 81.39496704182719,
+      "best_step": 268120064,
+      "best_median_return_pct": -78.40287890936641,
+      "best_profit_factor": 0.33367542767254343,
+      "best_median_dd_pct": 78.40287890936641,
+      "best_profitable_episode_ratio": 0.0,
+      "autopsy_comparison": {
+        "best_minus_latest": {
+          "median_return_pct": 4.694816035606806,
+          "median_max_drawdown_pct": -4.847099287040493,
+          "flat_bar_pct": 6.046626984126981,
+          "hold_action_pct": 0.6994047619047663,
+          "position_change_action_pct": -0.6994047619047663,
+          "avg_active_leverage": 0.01622714418307547,
+          "entries_per_episode": -2.6000000000000227,
+          "reversals_per_episode": -84.9,
+          "turnover_leverage_units_per_episode": -132.19999999999982,
+          "fees_pct_per_episode": -2.9056639744017545,
+          "slippage_pct_per_episode": -1.3543044151984027,
+          "funding_paid_pct_per_episode": 0.02190601602346384,
+          "gross_market_pnl_pct_per_episode": -1.276053943494993,
+          "avg_holding_bars": 0.277948696459986
+        },
+        "evidence": [
+          "BEST had materially lower turnover than LATEST.",
+          "BEST paid materially less fees per episode than LATEST."
+        ]
+      }
+    },
+    {
+      "student": 6,
+      "total_timesteps": 500002816,
+      "candidate_streak": 0,
+      "current_median_return_pct": -86.07577080008895,
+      "current_profit_factor": 0.22519890639636378,
+      "current_median_dd_pct": 86.09908175294339,
+      "best_step": 244109312,
+      "best_median_return_pct": -73.14897279633351,
+      "best_profit_factor": 0.31042633900299543,
+      "best_median_dd_pct": 73.14897279633351,
+      "best_profitable_episode_ratio": 0.0,
+      "autopsy_comparison": {
+        "best_minus_latest": {
+          "median_return_pct": 11.616601626270011,
+          "median_max_drawdown_pct": -11.610050717096215,
+          "flat_bar_pct": 16.145833333333332,
+          "hold_action_pct": 10.699404761904766,
+          "position_change_action_pct": -10.699404761904766,
+          "avg_active_leverage": -0.005220527496336391,
+          "entries_per_episode": -0.5999999999999659,
+          "reversals_per_episode": -217.1,
+          "turnover_leverage_units_per_episode": -514.0,
+          "fees_pct_per_episode": -6.673457852526198,
+          "slippage_pct_per_episode": -3.43238190375142,
+          "funding_paid_pct_per_episode": -0.0034589408082868643,
+          "gross_market_pnl_pct_per_episode": 2.335703789883102,
+          "avg_holding_bars": 0.25368700207906203
+        },
+        "evidence": [
+          "BEST had materially lower turnover than LATEST.",
+          "BEST paid materially less fees per episode than LATEST.",
+          "BEST repeated its existing target position materially more often than LATEST.",
+          "BEST generated better gross market PnL before explicit costs than LATEST."
+        ]
+      }
+    },
+    {
+      "student": 7,
+      "total_timesteps": 500002816,
+      "candidate_streak": 0,
+      "current_median_return_pct": -93.8409858332998,
+      "current_profit_factor": 0.19820450320425226,
+      "current_median_dd_pct": 93.84179118692214,
+      "best_step": 265658368,
+      "best_median_return_pct": -80.44248544070004,
+      "best_profit_factor": 0.3417394279598779,
+      "best_median_dd_pct": 80.46657995971418,
+      "best_profitable_episode_ratio": 0.0,
+      "autopsy_comparison": {
+        "best_minus_latest": {
+          "median_return_pct": 12.076182212386442,
+          "median_max_drawdown_pct": -12.065027015757124,
+          "flat_bar_pct": -4.613095238095241,
+          "hold_action_pct": 21.339285714285715,
+          "position_change_action_pct": -21.339285714285708,
+          "avg_active_leverage": -0.23694237336945045,
+          "entries_per_episode": -73.69999999999999,
+          "reversals_per_episode": -208.29999999999998,
+          "turnover_leverage_units_per_episode": -946.6000000000001,
+          "fees_pct_per_episode": -8.219300459929492,
+          "slippage_pct_per_episode": -3.5633049945350592,
+          "funding_paid_pct_per_episode": 0.02074509174025505,
+          "gross_market_pnl_pct_per_episode": 0.6039406165133764,
+          "avg_holding_bars": 1.2851320207851806
+        },
+        "evidence": [
+          "BEST had materially lower turnover than LATEST.",
+          "BEST paid materially less fees per episode than LATEST.",
+          "BEST repeated its existing target position materially more often than LATEST."
+        ]
+      }
+    },
+    {
+      "student": 8,
+      "total_timesteps": 500002816,
+      "candidate_streak": 0,
+      "current_median_return_pct": -92.5621742784522,
+      "current_profit_factor": 0.2131196669022415,
+      "current_median_dd_pct": 92.62530044368316,
+      "best_step": 315666432,
+      "best_median_return_pct": -87.08021783792049,
+      "best_profit_factor": 0.3200156307343407,
+      "best_median_dd_pct": 87.1205424824592,
+      "best_profitable_episode_ratio": 0.0,
+      "autopsy_comparison": {
+        "best_minus_latest": {
+          "median_return_pct": 4.867224319637899,
+          "median_max_drawdown_pct": -4.907595122440682,
+          "flat_bar_pct": 10.044642857142858,
+          "hold_action_pct": 7.633928571428573,
+          "position_change_action_pct": -7.6339285714285765,
+          "avg_active_leverage": 0.24982872398940437,
+          "entries_per_episode": 97.69999999999999,
+          "reversals_per_episode": -214.9,
+          "turnover_leverage_units_per_episode": -422.2999999999997,
+          "fees_pct_per_episode": -2.7283326544568283,
+          "slippage_pct_per_episode": -1.1726001975850124,
+          "funding_paid_pct_per_episode": 0.003725397312442506,
+          "gross_market_pnl_pct_per_episode": 1.1820301053376152,
+          "avg_holding_bars": 0.09980020083365604
+        },
+        "evidence": [
+          "BEST had materially lower turnover than LATEST.",
+          "BEST paid materially less fees per episode than LATEST.",
+          "BEST generated better gross market PnL before explicit costs than LATEST."
+        ]
+      }
+    }
+  ]
+}

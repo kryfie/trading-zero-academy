@@ -1,0 +1,57 @@
+name: Trading Zero Final Exam — Generation 3
+
+on:
+  workflow_dispatch:
+    inputs:
+      student_id:
+        description: "MASTER_CANDIDATE student ID (001-008)"
+        required: true
+        default: "001"
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: ${{ github.workspace }}
+
+jobs:
+  final-exam:
+    runs-on: ubuntu-latest
+    env:
+      STUDENT_ID: ${{ inputs.student_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install
+        run: pip install -r requirements.txt -r requirements_generation3.txt
+      - name: Restore immutable Generation 3 world
+        uses: actions/cache/restore@v4
+        with:
+          path: data/mtf
+          key: academy-gen3-v1-final-world-${{ github.run_id }}
+          restore-keys: |
+            academy-gen3-v1-frozen-world-
+            academy-gen2-frozen-world-
+      - name: Verify frozen world
+        run: python scripts/gen3_prepare_frozen_world.py
+      - name: Restore frozen candidate student
+        uses: actions/cache/restore@v4
+        with:
+          path: students_gen3/${{ inputs.student_id }}
+          key: academy-gen3-v1-final-student-${{ inputs.student_id }}-${{ github.run_id }}
+          restore-keys: |
+            academy-gen3-v1-student-${{ inputs.student_id }}-
+      - name: Run one-shot FINAL exam
+        run: python scripts/gen3_final_exam.py
+      - name: Upload FINAL result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: generation3-final-student-${{ inputs.student_id }}
+          path: students_gen3/${{ inputs.student_id }}/reports/final_exam.json
+          if-no-files-found: warn
+          retention-days: 365

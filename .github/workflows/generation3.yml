@@ -1,0 +1,217 @@
+name: Trading Zero Academy — Generation 3
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_mode:
+        description: "FIRST RUN: start | later/manual recovery: resume"
+        required: true
+        default: resume
+        type: choice
+        options:
+          - resume
+          - start
+      student_count:
+        description: "Generation 3 students (frozen: 8)"
+        required: true
+        default: "8"
+        type: string
+      target_total_timesteps:
+        description: "Hard ceiling per student (frozen: 1B)"
+        required: true
+        default: "1000000000"
+        type: string
+      auto_continue:
+        description: "Queue next cohort round automatically"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: trading-zero-generation3-v1
+  cancel-in-progress: false
+
+env:
+  PYTHONPATH: ${{ github.workspace }}
+
+jobs:
+  prepare-world:
+    runs-on: ubuntu-latest
+    outputs:
+      students: ${{ steps.matrix.outputs.students }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install
+        run: pip install -r requirements.txt -r requirements_generation3.txt pytest
+      - name: Verify Generation 3 layout
+        run: |
+          test -f academy/gen2_env.py
+          test -f academy/gen3_env.py
+          test -f academy/gen3_evaluate.py
+          test -f academy/gen3_telemetry.py
+          test -f scripts/gen3_prepare_frozen_world.py
+          test -f scripts/gen3_cohort_train.py
+          test -f config_generation3.yaml
+          test -f data/manifests/generation1_partition_reference.json
+          echo "Generation 3 layout OK"
+      - name: Generation 3 unit tests
+        if: ${{ inputs.run_mode == 'start' }}
+        run: pytest -q tests/test_gen3_protocol.py tests/test_checkpoint_registry.py tests/test_recurrent_utils.py
+      - name: Build student matrix
+        id: matrix
+        env:
+          STUDENT_COUNT: ${{ inputs.student_count }}
+          TARGET: ${{ inputs.target_total_timesteps }}
+        run: |
+          python - <<'PY'
+          import json, os
+          n = int(os.environ["STUDENT_COUNT"])
+          target = int(os.environ["TARGET"])
+          if n != 8:
+              raise SystemExit("Generation 3 protocol is frozen at exactly 8 students.")
+          if target != 1_000_000_000:
+              raise SystemExit("Generation 3 protocol is frozen at exactly 1B timesteps.")
+          students = [f"{i:03d}" for i in range(1, n + 1)]
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
+              f.write("students=" + json.dumps(students) + "\n")
+          print("Students:", students)
+          PY
+      - name: Restore immutable frozen world
+        uses: actions/cache/restore@v4
+        with:
+          path: data/mtf
+          key: academy-gen3-v1-frozen-world-${{ github.run_id }}
+          restore-keys: |
+            academy-gen3-v1-frozen-world-
+            academy-gen2-frozen-world-
+            academy-mtf-world-
+      - name: Prepare and hard-verify frozen market world
+        run: python scripts/gen3_prepare_frozen_world.py
+      - name: Save immutable Generation 3 world
+        uses: actions/cache/save@v4
+        with:
+          path: data/mtf
+          key: academy-gen3-v1-frozen-world-${{ github.run_id }}
+      - name: Upload identical world for all students
+        uses: actions/upload-artifact@v4
+        with:
+          name: academy-gen3-world-${{ github.run_id }}
+          path: data/mtf
+          retention-days: 2
+
+  train-students:
+    needs: prepare-world
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        student: ${{ fromJSON(needs.prepare-world.outputs.students) }}
+    env:
+      STUDENT_ID: ${{ matrix.student }}
+      GEN3_RUN_MODE: ${{ inputs.run_mode }}
+      COHORT_TARGET_TIMESTEPS: ${{ inputs.target_total_timesteps }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install
+        run: pip install -r requirements.txt -r requirements_generation3.txt
+      - name: Download identical frozen world
+        uses: actions/download-artifact@v4
+        with:
+          name: academy-gen3-world-${{ github.run_id }}
+          path: data/mtf
+      - name: Restore independent Gen3 Student ${{ matrix.student }}
+        if: ${{ inputs.run_mode == 'resume' }}
+        uses: actions/cache/restore@v4
+        with:
+          path: students_gen3/${{ matrix.student }}
+          key: academy-gen3-v1-student-${{ matrix.student }}-${{ github.run_id }}
+          restore-keys: |
+            academy-gen3-v1-student-${{ matrix.student }}-
+      - name: Train Gen3 Student ${{ matrix.student }}
+        run: python scripts/gen3_cohort_train.py
+      - name: Recurrent Policy Autopsy
+        run: python scripts/gen3_policy_autopsy.py
+      - name: Build Student summary
+        run: python scripts/gen3_student_summary.py
+      - name: Save independent Gen3 Student ${{ matrix.student }}
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: students_gen3/${{ matrix.student }}
+          key: academy-gen3-v1-student-${{ matrix.student }}-${{ github.run_id }}
+      - name: Upload Gen3 Student ${{ matrix.student }} report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gen3-student-${{ matrix.student }}-${{ github.run_number }}
+          path: |
+            students_gen3/${{ matrix.student }}/reports
+            students_gen3/${{ matrix.student }}/models/best_validation.json
+            students_gen3/${{ matrix.student }}/models/master_candidate.json
+            students_gen3/${{ matrix.student }}/models/checkpoint_registry.json
+            students_gen3/${{ matrix.student }}/models/validation_registry/*.json
+          if-no-files-found: warn
+          retention-days: 90
+
+  leaderboard:
+    needs: [prepare-world, train-students]
+    if: always() && needs.prepare-world.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: gen3-student-*-${{ github.run_number }}
+          path: cohort-artifacts
+          merge-multiple: false
+      - name: Build Generation 3 leaderboard
+        run: python scripts/gen3_build_leaderboard.py
+      - name: Upload Generation 3 cohort report
+        uses: actions/upload-artifact@v4
+        with:
+          name: academy-generation3-cohort-${{ github.run_number }}
+          path: |
+            reports/cohort_gen3
+            cohort-artifacts
+          retention-days: 90
+      - name: Decide whether Generation 3 continues
+        id: decision
+        env:
+          COHORT_TARGET_TIMESTEPS: ${{ inputs.target_total_timesteps }}
+          COHORT_STUDENT_COUNT: ${{ inputs.student_count }}
+          COHORT_AUTO_CONTINUE: ${{ inputs.auto_continue }}
+        run: python scripts/gen3_cohort_decision.py
+      - name: Queue next Generation 3 round
+        if: ${{ steps.decision.outputs.continue == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET: ${{ inputs.target_total_timesteps }}
+          STUDENT_COUNT: ${{ inputs.student_count }}
+        run: |
+          curl --fail-with-body -L \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/generation3.yml/dispatches" \
+            -d "{\"ref\":\"${GITHUB_REF_NAME}\",\"inputs\":{\"run_mode\":\"resume\",\"student_count\":\"${STUDENT_COUNT}\",\"target_total_timesteps\":\"${TARGET}\",\"auto_continue\":\"true\"}}"
+      - name: Generation 3 stop reason
+        if: ${{ steps.decision.outputs.continue != 'true' }}
+        run: |
+          echo "Generation 3 chain stopped."
+          echo "1B is the frozen hard ceiling. Do not extend after observing the result."
+          echo "FINAL remains manual and locked unless a MASTER_CANDIDATE exists."

@@ -1,0 +1,2 @@
+# Add-on requirements for Generation 3. Keep the existing requirements.txt unchanged.
+sb3-contrib==2.4.0
