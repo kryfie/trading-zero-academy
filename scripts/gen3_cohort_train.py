@@ -125,6 +125,9 @@ candidate_streak = int(state.get("candidate_streak", 0))
 validation_index = int(state.get("validation_index", 0))
 blocks_completed = 0
 run_started = time.time()
+soft_runtime_minutes = int(os.environ.get("GEN3_SOFT_RUNTIME_MINUTES", "270"))
+soft_runtime_seconds = max(60, soft_runtime_minutes * 60)
+soft_stopped = False
 last_metrics = state.get("last_validation")
 last_candidate = bool(state.get("last_candidate", False))
 
@@ -208,6 +211,25 @@ def save_status(metrics: dict | None):
     })
 
 
+
+def persist_state():
+    state.update({
+        "generation": 3,
+        "experiment_id": experiment_id,
+        "cohort_round_index": cohort_round_index,
+        "candidate_streak": candidate_streak,
+        "validation_index": validation_index,
+        "last_validation": last_metrics,
+        "last_candidate": last_candidate,
+        "student_id": student_id,
+        "student_mode": student_mode,
+        "student_seed": student_base_seed,
+        "seed_reference_id": seed_reference_id,
+        "last_saved_timesteps": int(model.num_timesteps),
+    })
+    write_json(paths["state"], state)
+
+
 def run_validation():
     global candidate_streak, validation_index, last_metrics, last_candidate
     validation_index += 1
@@ -239,9 +261,17 @@ def run_validation():
         print(f"Gen3 Student #{student_id}: MASTER_CANDIDATE frozen for manual FINAL EXAM")
     append_history(metrics)
     save_status(metrics)
+    persist_state()
 
 if int(model.num_timesteps) < target_total:
     while int(model.num_timesteps) < run_target:
+        if (time.time() - run_started) >= soft_runtime_seconds:
+            soft_stopped = True
+            print(
+                f"Gen3 Student #{student_id}: soft runtime ceiling reached "
+                f"({soft_runtime_minutes} min). Exiting cleanly so checkpoint/cache can be saved."
+            )
+            break
         requested = min(block_steps, run_target - int(model.num_timesteps))
         block_start = int(model.num_timesteps)
         before = capture_parameter_state(model)
@@ -250,6 +280,7 @@ if int(model.num_timesteps) < target_total:
         elapsed = time.time() - block_started
         model.save(paths["latest"])
         blocks_completed += 1
+        persist_state()
         append_telemetry(paths["telemetry"], collect_training_telemetry(
             model, before, cohort_round_index, blocks_completed, block_start, elapsed
         ))
@@ -259,17 +290,14 @@ if int(model.num_timesteps) < target_total:
 else:
     print(f"Gen3 Student #{student_id} already reached {target_total:,}; no training.")
 
+if soft_stopped and blocks_completed > 0 and (blocks_completed % validation_interval_blocks) != 0:
+    print(f"Gen3 Student #{student_id}: running one validation before graceful runtime exit.")
+    run_validation()
+
 model.save(paths["latest"])
 if last_metrics is None:
     run_validation()
-state.update({
-    "generation": 3, "experiment_id": experiment_id, "cohort_round_index": cohort_round_index,
-    "candidate_streak": candidate_streak, "validation_index": validation_index,
-    "last_validation": last_metrics, "last_candidate": last_candidate,
-    "student_id": student_id, "student_mode": student_mode,
-    "student_seed": student_base_seed, "seed_reference_id": seed_reference_id,
-})
-write_json(paths["state"], state)
+persist_state()
 save_status(last_metrics)
 print("=== GENERATION 3 STUDENT ROUND COMPLETE ===")
 print(f"Student #{student_id} | {student_mode}")
