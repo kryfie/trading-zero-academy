@@ -50,7 +50,7 @@ learner:
   policy: MlpLstmPolicy
   timesteps_per_block: 500000
   validation_interval_blocks: 4
-  steps_per_round: 4000000
+  steps_per_round: 2000000
   target_total_timesteps: 1000000000
   learning_rate: 0.0003
   n_steps: 2048
