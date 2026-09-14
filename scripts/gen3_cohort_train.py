@@ -6,6 +6,7 @@ import time
 
 from sb3_contrib import RecurrentPPO
 from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.callbacks import BaseCallback
 
 from academy.config import load_config, ROOT
 from academy.cohort import student_seed
@@ -13,9 +14,28 @@ from academy.gen3_paths import gen3_student_paths, ensure_gen3_student_dirs, loa
 from academy.splits import load_partition_reference, load_mtf_frames, build_frozen_partitions, partition_summary
 from academy.gen3_env import Generation3TradingEnv, build_target_levels
 from academy.gen3_evaluate import evaluate_recurrent_model, passes_candidate_gate
-from academy.training_utils import is_better_validation, should_validate, update_candidate_streak
+from academy.training_utils import is_better_validation, update_candidate_streak
 from academy.gen3_telemetry import capture_parameter_state, collect_training_telemetry, append_telemetry
 from academy.checkpoint_registry import update_validation_registry
+
+class WallClockStopCallback(BaseCallback):
+    """Stop RecurrentPPO cleanly from inside model.learn before the GitHub hard timeout."""
+
+    def __init__(self, deadline_monotonic: float, check_freq: int = 256):
+        super().__init__(verbose=0)
+        self.deadline_monotonic = float(deadline_monotonic)
+        self.check_freq = max(1, int(check_freq))
+        self.stopped_for_time = False
+
+    def _on_step(self) -> bool:
+        if self.n_calls % self.check_freq != 0:
+            return True
+        if time.monotonic() >= self.deadline_monotonic:
+            self.stopped_for_time = True
+            print("Gen3 wall-clock callback: soft runtime reached; stopping model.learn cleanly.")
+            return False
+        return True
+
 
 cfg = load_config(ROOT / "config_generation3.yaml")
 m = cfg["market"]
@@ -125,11 +145,27 @@ candidate_streak = int(state.get("candidate_streak", 0))
 validation_index = int(state.get("validation_index", 0))
 blocks_completed = 0
 run_started = time.time()
-soft_runtime_minutes = int(os.environ.get("GEN3_SOFT_RUNTIME_MINUTES", "270"))
+run_started_monotonic = time.monotonic()
+soft_runtime_minutes = int(os.environ.get("GEN3_SOFT_RUNTIME_MINUTES", "210"))
 soft_runtime_seconds = max(60, soft_runtime_minutes * 60)
+soft_deadline_monotonic = run_started_monotonic + soft_runtime_seconds
 soft_stopped = False
 last_metrics = state.get("last_validation")
 last_candidate = bool(state.get("last_candidate", False))
+
+# Preserve the scientific validation cadence across short infrastructure runs.
+# Gen3's frozen cadence is still 4 x 500k = ~2M training steps between validations.
+validation_every_steps = block_steps * validation_interval_blocks
+last_validation_timesteps = int(state.get("last_validation_timesteps", 0) or 0)
+if last_validation_timesteps <= 0 and last_metrics is not None:
+    last_validation_timesteps = int(state.get("last_saved_timesteps", start_total) or start_total)
+next_validation_at = (
+    last_validation_timesteps + validation_every_steps
+    if last_validation_timesteps > 0
+    else validation_every_steps
+)
+while next_validation_at <= start_total:
+    next_validation_at += validation_every_steps
 
 HISTORY_FIELDS = [
     "timestamp_utc", "generation", "experiment_id", "student_id", "student_mode", "seed_reference_id",
@@ -221,6 +257,7 @@ def persist_state():
         "validation_index": validation_index,
         "last_validation": last_metrics,
         "last_candidate": last_candidate,
+        "last_validation_timesteps": int(last_validation_timesteps),
         "student_id": student_id,
         "student_mode": student_mode,
         "student_seed": student_base_seed,
@@ -231,12 +268,13 @@ def persist_state():
 
 
 def run_validation():
-    global candidate_streak, validation_index, last_metrics, last_candidate
+    global candidate_streak, validation_index, last_metrics, last_candidate, last_validation_timesteps
     validation_index += 1
     metrics = evaluate_current(model)
     candidate = passes_candidate_gate(metrics, cfg)
     candidate_streak = update_candidate_streak(candidate_streak, candidate)
     last_metrics, last_candidate = metrics, candidate
+    last_validation_timesteps = int(model.num_timesteps)
     incumbent = load_json(paths["best_metrics"], None)
     metadata = {
         "generation": 3, "experiment_id": experiment_id, "student": student_id,
@@ -265,18 +303,26 @@ def run_validation():
 
 if int(model.num_timesteps) < target_total:
     while int(model.num_timesteps) < run_target:
-        if (time.time() - run_started) >= soft_runtime_seconds:
+        if time.monotonic() >= soft_deadline_monotonic:
             soft_stopped = True
             print(
                 f"Gen3 Student #{student_id}: soft runtime ceiling reached "
                 f"({soft_runtime_minutes} min). Exiting cleanly so checkpoint/cache can be saved."
             )
             break
+
         requested = min(block_steps, run_target - int(model.num_timesteps))
         block_start = int(model.num_timesteps)
         before = capture_parameter_state(model)
         block_started = time.time()
-        model.learn(total_timesteps=max(1, requested), reset_num_timesteps=False)
+
+        wall_clock_callback = WallClockStopCallback(soft_deadline_monotonic)
+        model.learn(
+            total_timesteps=max(1, requested),
+            reset_num_timesteps=False,
+            callback=wall_clock_callback,
+        )
+
         elapsed = time.time() - block_started
         model.save(paths["latest"])
         blocks_completed += 1
@@ -284,19 +330,25 @@ if int(model.num_timesteps) < target_total:
         append_telemetry(paths["telemetry"], collect_training_telemetry(
             model, before, cohort_round_index, blocks_completed, block_start, elapsed
         ))
-        at_run_end = int(model.num_timesteps) >= run_target
-        if should_validate(blocks_completed, validation_interval_blocks, at_run_end=at_run_end):
+
+        # Validation remains tied to cumulative training progress, not workflow run count.
+        if int(model.num_timesteps) >= next_validation_at:
             run_validation()
+            next_validation_at = last_validation_timesteps + validation_every_steps
+
+        if wall_clock_callback.stopped_for_time:
+            soft_stopped = True
+            print(
+                f"Gen3 Student #{student_id}: model.learn stopped safely at "
+                f"{model.num_timesteps:,} timesteps because the soft wall-clock limit was reached."
+            )
+            break
 else:
     print(f"Gen3 Student #{student_id} already reached {target_total:,}; no training.")
 
-if soft_stopped and blocks_completed > 0 and (blocks_completed % validation_interval_blocks) != 0:
-    print(f"Gen3 Student #{student_id}: running one validation before graceful runtime exit.")
-    run_validation()
-
+# Do NOT force an extra validation merely because an infrastructure run ended.
+# This preserves the frozen ~2M-step validation cadence and candidate-streak semantics.
 model.save(paths["latest"])
-if last_metrics is None:
-    run_validation()
 persist_state()
 save_status(last_metrics)
 print("=== GENERATION 3 STUDENT ROUND COMPLETE ===")
