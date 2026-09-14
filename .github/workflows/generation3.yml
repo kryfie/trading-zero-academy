@@ -120,7 +120,7 @@ jobs:
       STUDENT_ID: ${{ matrix.student }}
       GEN3_RUN_MODE: ${{ inputs.run_mode }}
       COHORT_TARGET_TIMESTEPS: ${{ inputs.target_total_timesteps }}
-      GEN3_SOFT_RUNTIME_MINUTES: "270"
+      GEN3_SOFT_RUNTIME_MINUTES: "210"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
